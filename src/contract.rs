@@ -129,7 +129,7 @@ pub fn try_withdraw(
         return Err(ContractError::Unauthorized {});
     }
 
-    // burn msg
+    // receive cw20 tokens
     let burn = Cw20ExecuteMsg::TransferFrom {
         owner: info.sender.clone().into(),
         recipient: env.contract.address.into(),
@@ -137,6 +137,16 @@ pub fn try_withdraw(
     };
 
     let message = WasmMsg::Execute {
+        contract_addr: state.contract.unwrap(),
+        msg: to_binary(&burn)?,
+        send: vec![],
+    }
+    .into();
+
+    // burn tokens
+    let burn = Cw20ExecuteMsg::Burn { amount };
+
+    let burn_msg = WasmMsg::Execute {
         contract_addr: state.contract.unwrap(),
         msg: to_binary(&burn)?,
         send: vec![],
@@ -158,7 +168,7 @@ pub fn try_withdraw(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![message, bank_send],
+        messages: vec![message, burn_msg, bank_send],
         attributes,
         data: None,
     })
