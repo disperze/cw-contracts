@@ -3,6 +3,8 @@ name = "wjuno"
 version = "0.1.0"
 authors = ["Giancarlos Salas <giansalex@gmail.com>"]
 edition = "2018"
+description = "CosmWasm contract for wrapped JUNO into CW20"
+repository = "https://github.com/giansalex/cw-wjuno"
 
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
