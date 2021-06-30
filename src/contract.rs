@@ -1,12 +1,13 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, BankMsg, Coin, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg, WasmQuery,
+    attr, entry_point, to_binary, BankMsg, Coin, CosmosMsg, DepsMut, Env, MessageInfo, Response,
+    Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{State, STATE};
 
-use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, BalanceResponse};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 
 const JUNO_COIN: &str = "ujuno";
 
@@ -43,7 +44,11 @@ pub fn execute(
     }
 }
 
-pub fn try_update_contract(deps: DepsMut, info: MessageInfo, contract: String) -> Result<Response, ContractError> {
+pub fn try_update_contract(
+    deps: DepsMut,
+    info: MessageInfo,
+    contract: String,
+) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
 
     if info.sender != state.owner {
@@ -63,12 +68,15 @@ pub fn try_update_contract(deps: DepsMut, info: MessageInfo, contract: String) -
 }
 
 pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
-
-    if info.funds.iter().any(|x| x.denom.ne(JUNO_COIN))  {
+    if info.funds.iter().any(|x| x.denom.ne(JUNO_COIN)) {
         return Err(ContractError::Unauthorized {});
     }
 
-    let amount_to = info.funds.iter().map(|x| x.amount).fold(0u8.into(), |acc, amount| acc + amount);
+    let amount_to = info
+        .funds
+        .iter()
+        .map(|x| x.amount)
+        .fold(0u8.into(), |acc, amount| acc + amount);
     let mint = Cw20ExecuteMsg::Mint {
         recipient: info.sender.clone().into(),
         amount: amount_to,
@@ -95,10 +103,11 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
     })
 }
 
-pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Response, ContractError> {
-
-    // TODO: Validate contract no empty
-    
+pub fn try_withdrawal(
+    deps: DepsMut,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
     // check balance
     let balance = Cw20QueryMsg::Balance {
         address: info.sender.clone().into(),
@@ -117,10 +126,8 @@ pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Resu
     }
 
     // burn msg
-    let burn = Cw20ExecuteMsg::Burn {
-        amount,
-    };
-    
+    let burn = Cw20ExecuteMsg::Burn { amount };
+
     let message = WasmMsg::Execute {
         contract_addr: state.contract.unwrap(),
         msg: to_binary(&burn)?,
@@ -152,14 +159,14 @@ pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cosmwasm_std::coins;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins};
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg { };
+        let msg = InstantiateMsg {};
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -171,5 +178,4 @@ mod tests {
         // let value: CountResponse = from_binary(&res).unwrap();
         // assert_eq!(17, value.count);
     }
-
 }
