@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{State, STATE};
 
-use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20::{ Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg, AllowanceResponse};
 
 const JUNO_COIN: &str = "ujuno";
 
@@ -113,19 +113,20 @@ pub fn try_withdraw(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // check balance
-    let balance = Cw20QueryMsg::Balance {
-        address: info.sender.clone().into(),
+    let allowance = Cw20QueryMsg::Allowance {
+        owner: info.sender.clone().into(),
+        spender: env.contract.address.clone().into(),
     };
 
     let state = STATE.load(deps.storage)?;
     let request = WasmQuery::Smart {
         contract_addr: state.contract.clone().unwrap(),
-        msg: to_binary(&balance)?,
+        msg: to_binary(&allowance)?,
     }
     .into();
-    let res: BalanceResponse = deps.querier.query(&request)?;
+    let res: AllowanceResponse = deps.querier.query(&request)?;
 
-    if res.balance > amount {
+    if amount > res.allowance {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -137,7 +138,7 @@ pub fn try_withdraw(
     };
 
     let message = WasmMsg::Execute {
-        contract_addr: state.contract.unwrap(),
+        contract_addr: state.contract.clone().unwrap(),
         msg: to_binary(&burn)?,
         send: vec![],
     }
@@ -159,17 +160,14 @@ pub fn try_withdraw(
         amount: vec![Coin::new(amount.into(), JUNO_COIN)],
     });
 
-    // return msg
-    let attributes = vec![
-        attr("action", "withdraw"),
-        attr("amount", amount),
-        attr("sender", info.sender),
-    ];
-
     Ok(Response {
         submessages: vec![],
         messages: vec![message, burn_msg, bank_send],
-        attributes,
+        attributes: vec![
+            attr("action", "withdraw"),
+            attr("amount", amount),
+            attr("sender", info.sender),
+        ],
         data: None,
     })
 }
