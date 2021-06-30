@@ -5,7 +5,6 @@ use cosmwasm_std::{Uint128};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub contract: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -13,4 +12,5 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     Deposit {},
     Withdrawal { amount: Uint128 },
+    SetContract { contract: String },
 }

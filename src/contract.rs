@@ -17,11 +17,11 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
+    _: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
-        contract: msg.contract,
+        contract: "".into(),
     };
     STATE.save(deps.storage, &state)?;
 
@@ -39,7 +39,27 @@ pub fn execute(
     match msg {
         ExecuteMsg::Deposit {} => try_deposit(deps, info),
         ExecuteMsg::Withdrawal { amount } => try_withdrawal(deps, info, amount),
+        ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
     }
+}
+
+pub fn try_update_contract(deps: DepsMut, info: MessageInfo, contract: String) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+
+    if info.sender != state.owner {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    if state.contract != "" {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+        state.contract = contract;
+        Ok(state)
+    })?;
+
+    Ok(Response::default())
 }
 
 pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
@@ -48,6 +68,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
         return Err(ContractError::Unauthorized {});
     }
 
+    // TODO: Validate contract no empty 
     let amount_to = info.funds.iter().map(|x| x.amount).fold(0u8.into(), |acc, amount| acc + amount);
     let mint = Cw20ExecuteMsg::Mint {
         recipient: info.sender.clone().into(),
@@ -77,6 +98,8 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
 
 pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Result<Response, ContractError> {
 
+    // TODO: Validate contract no empty
+    
     // check balance
     let balance = Cw20QueryMsg::Balance {
         address: info.sender.clone().into(),

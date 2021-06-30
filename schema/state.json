@@ -3,9 +3,13 @@
   "title": "State",
   "type": "object",
   "required": [
+    "contract",
     "owner"
   ],
   "properties": {
+    "contract": {
+      "type": "string"
+    },
     "owner": {
       "$ref": "#/definitions/Addr"
     }
