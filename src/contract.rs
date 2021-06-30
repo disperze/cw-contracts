@@ -55,7 +55,7 @@ pub fn try_update_contract(
         return Err(ContractError::Unauthorized {});
     }
 
-    if let Some(_) = state.contract {
+    if state.contract.is_some() {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -84,7 +84,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
 
     let state = STATE.load(deps.storage)?;
     let message = WasmMsg::Execute {
-        contract_addr: state.contract.unwrap().into(),
+        contract_addr: state.contract.unwrap(),
         msg: to_binary(&mint)?,
         send: vec![],
     }
