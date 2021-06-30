@@ -18,7 +18,7 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    _: InstantiateMsg,
+    _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
@@ -33,13 +33,13 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Deposit {} => try_deposit(deps, info),
-        ExecuteMsg::Withdraw { amount } => try_withdraw(deps, info, amount),
+        ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
         ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
     }
 }
@@ -105,6 +105,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
 
 pub fn try_withdraw(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
@@ -126,7 +127,11 @@ pub fn try_withdraw(
     }
 
     // burn msg
-    let burn = Cw20ExecuteMsg::Burn { amount };
+    let burn = Cw20ExecuteMsg::TransferFrom {
+        owner: info.sender.clone().into(),
+        recipient: env.contract.address.into(),
+        amount
+    };
 
     let message = WasmMsg::Execute {
         contract_addr: state.contract.unwrap(),
