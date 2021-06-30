@@ -21,7 +21,7 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
-        contract: "".into(),
+        contract: None,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -50,12 +50,12 @@ pub fn try_update_contract(deps: DepsMut, info: MessageInfo, contract: String) -
         return Err(ContractError::Unauthorized {});
     }
 
-    if state.contract != "" {
+    if let Some(_) = state.contract {
         return Err(ContractError::Unauthorized {});
     }
 
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.contract = contract;
+        state.contract = Some(contract);
         Ok(state)
     })?;
 
@@ -68,7 +68,6 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
         return Err(ContractError::Unauthorized {});
     }
 
-    // TODO: Validate contract no empty 
     let amount_to = info.funds.iter().map(|x| x.amount).fold(0u8.into(), |acc, amount| acc + amount);
     let mint = Cw20ExecuteMsg::Mint {
         recipient: info.sender.clone().into(),
@@ -77,7 +76,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
 
     let state = STATE.load(deps.storage)?;
     let message = WasmMsg::Execute {
-        contract_addr: state.contract.into(),
+        contract_addr: state.contract.unwrap().into(),
         msg: to_binary(&mint)?,
         send: vec![],
     }
@@ -107,7 +106,7 @@ pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Resu
 
     let state = STATE.load(deps.storage)?;
     let request = WasmQuery::Smart {
-        contract_addr: state.contract.to_owned(),
+        contract_addr: state.contract.clone().unwrap(),
         msg: to_binary(&balance)?,
     }
     .into();
@@ -123,7 +122,7 @@ pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Resu
     };
     
     let message = WasmMsg::Execute {
-        contract_addr: state.contract,
+        contract_addr: state.contract.unwrap(),
         msg: to_binary(&burn)?,
         send: vec![],
     }
@@ -160,7 +159,7 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg { contract: "juno1kalo3ksm".into() };
+        let msg = InstantiateMsg { };
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
