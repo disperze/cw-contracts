@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{State, STATE};
 
-use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 const JUNO_COIN: &str = "ujuno";
 
@@ -41,6 +41,7 @@ pub fn execute(
         ExecuteMsg::Deposit {} => try_deposit(deps, info),
         ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
         ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
+        ExecuteMsg::Receive { 0: Cw20ReceiveMsg {amount, sender, ..} } => try_receive(deps, info, sender, amount),
     }
 }
 
@@ -159,6 +160,46 @@ pub fn try_withdraw(
         submessages: vec![],
         messages: vec![message, bank_send],
         attributes,
+        data: None,
+    })
+}
+
+pub fn try_receive(
+    deps: DepsMut,
+    info: MessageInfo,
+    sender: String,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+    // validate owner contract
+    let state = STATE.load(deps.storage)?;
+    if info.sender != state.contract.clone().unwrap() {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // burn coins
+    let burn = Cw20ExecuteMsg::Burn { amount };
+
+    let burn_msg = WasmMsg::Execute {
+        contract_addr: state.contract.unwrap(),
+        msg: to_binary(&burn)?,
+        send: vec![],
+    }
+    .into();
+
+    // withdraw coins
+    let bank_send = CosmosMsg::Bank(BankMsg::Send {
+        to_address: sender.to_owned(),
+        amount: vec![Coin::new(amount.into(), JUNO_COIN)],
+    });
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![burn_msg, bank_send],
+        attributes: vec![
+            attr("action", "receive_to_withdraw"),
+            attr("amount", amount),
+            attr("sender", sender),
+        ],
         data: None,
     })
 }
