@@ -10,6 +10,6 @@ pub struct InstantiateMsg {}
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     Deposit {},
-    Withdrawal { amount: Uint128 },
+    Withdraw { amount: Uint128 },
     SetContract { contract: String },
 }

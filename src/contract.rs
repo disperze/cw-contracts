@@ -39,7 +39,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Deposit {} => try_deposit(deps, info),
-        ExecuteMsg::Withdrawal { amount } => try_withdrawal(deps, info, amount),
+        ExecuteMsg::Withdraw { amount } => try_withdraw(deps, info, amount),
         ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
     }
 }
@@ -103,7 +103,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
     })
 }
 
-pub fn try_withdrawal(
+pub fn try_withdraw(
     deps: DepsMut,
     info: MessageInfo,
     amount: Uint128,
@@ -143,7 +143,7 @@ pub fn try_withdrawal(
 
     // return msg
     let attributes = vec![
-        attr("action", "withdrawal"),
+        attr("action", "withdraw"),
         attr("amount", amount),
         attr("sender", info.sender),
     ];
