@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{State, STATE};
 
-use cw20::{ Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg, AllowanceResponse};
+use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 const JUNO_COIN: &str = "ujuno";
 
@@ -41,7 +41,9 @@ pub fn execute(
         ExecuteMsg::Deposit {} => try_deposit(deps, info),
         ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
         ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
-        ExecuteMsg::Receive { 0: Cw20ReceiveMsg {amount, sender, ..} } => try_receive(deps, info, sender, amount),
+        ExecuteMsg::Receive {
+            0: Cw20ReceiveMsg { amount, sender, .. },
+        } => try_receive(deps, info, sender, amount),
     }
 }
 
@@ -134,7 +136,7 @@ pub fn try_withdraw(
     let burn = Cw20ExecuteMsg::TransferFrom {
         owner: info.sender.clone().into(),
         recipient: env.contract.address.into(),
-        amount
+        amount,
     };
 
     let message = WasmMsg::Execute {
