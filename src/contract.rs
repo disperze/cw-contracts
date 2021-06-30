@@ -59,6 +59,8 @@ pub fn try_update_contract(
         return Err(ContractError::Unauthorized {});
     }
 
+    deps.api.addr_validate(&contract)?;
+
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         state.contract = Some(contract);
         Ok(state)
