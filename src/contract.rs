@@ -8,6 +8,8 @@ use crate::state::{State, STATE};
 
 use cw20::{Cw20ExecuteMsg, Cw20QueryMsg, BalanceResponse};
 
+const JUNO_COIN: &str = "ujuno";
+
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
 #[entry_point]
@@ -15,10 +17,11 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    _: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
+        contract: msg.contract,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -34,14 +37,14 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit {} => try_deposit(info),
+        ExecuteMsg::Deposit {} => try_deposit(deps, info),
         ExecuteMsg::Withdrawal { amount } => try_withdrawal(deps, info, amount),
     }
 }
 
-pub fn try_deposit(info: MessageInfo) -> Result<Response, ContractError> {
+pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
 
-    if info.funds.iter().any(|x| x.denom != "ujuno")  {
+    if info.funds.iter().any(|x| x.denom.ne(JUNO_COIN))  {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -51,8 +54,9 @@ pub fn try_deposit(info: MessageInfo) -> Result<Response, ContractError> {
         amount: amount_to,
     };
 
+    let state = STATE.load(deps.storage)?;
     let message = WasmMsg::Execute {
-        contract_addr: "".into(),
+        contract_addr: state.contract.into(),
         msg: to_binary(&mint)?,
         send: vec![],
     }
@@ -78,8 +82,9 @@ pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Resu
         address: info.sender.clone().into(),
     };
 
+    let state = STATE.load(deps.storage)?;
     let request = WasmQuery::Smart {
-        contract_addr: "".into(),
+        contract_addr: state.contract.to_owned(),
         msg: to_binary(&balance)?,
     }
     .into();
@@ -95,7 +100,7 @@ pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Resu
     };
     
     let message = WasmMsg::Execute {
-        contract_addr: "".into(),
+        contract_addr: state.contract,
         msg: to_binary(&burn)?,
         send: vec![],
     }
@@ -104,7 +109,7 @@ pub fn try_withdrawal(deps: DepsMut, info: MessageInfo, amount: Uint128) -> Resu
     // return funds
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.clone().into(),
-        amount: vec![Coin::new(amount.into(), "ujuno")],
+        amount: vec![Coin::new(amount.into(), JUNO_COIN)],
     });
 
     // return msg
@@ -132,7 +137,7 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg { };
+        let msg = InstantiateMsg { contract: "juno1kalo3ksm".into() };
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
