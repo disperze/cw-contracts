@@ -22,7 +22,7 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
-        contract: None,
+        contract: "".into(),
     };
     STATE.save(deps.storage, &state)?;
 
@@ -58,14 +58,14 @@ pub fn try_update_contract(
         return Err(ContractError::Unauthorized {});
     }
 
-    if state.contract.is_some() {
+    if !state.contract.is_empty() {
         return Err(ContractError::Unauthorized {});
     }
 
     deps.api.addr_validate(&contract)?;
 
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.contract = Some(contract);
+        state.contract = contract;
         Ok(state)
     })?;
 
@@ -89,7 +89,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
 
     let state = STATE.load(deps.storage)?;
     let message = WasmMsg::Execute {
-        contract_addr: state.contract.unwrap(),
+        contract_addr: state.contract,
         msg: to_binary(&mint)?,
         send: vec![],
     }
@@ -122,7 +122,7 @@ pub fn try_withdraw(
 
     let state = STATE.load(deps.storage)?;
     let request = WasmQuery::Smart {
-        contract_addr: state.contract.clone().unwrap(),
+        contract_addr: state.contract.to_owned(),
         msg: to_binary(&allowance)?,
     }
     .into();
@@ -140,7 +140,7 @@ pub fn try_withdraw(
     };
 
     let message = WasmMsg::Execute {
-        contract_addr: state.contract.clone().unwrap(),
+        contract_addr: state.contract.to_owned(),
         msg: to_binary(&burn)?,
         send: vec![],
     }
@@ -150,7 +150,7 @@ pub fn try_withdraw(
     let burn = Cw20ExecuteMsg::Burn { amount };
 
     let burn_msg = WasmMsg::Execute {
-        contract_addr: state.contract.unwrap(),
+        contract_addr: state.contract,
         msg: to_binary(&burn)?,
         send: vec![],
     }
@@ -182,7 +182,7 @@ pub fn try_receive(
 ) -> Result<Response, ContractError> {
     // validate owner contract
     let state = STATE.load(deps.storage)?;
-    if info.sender != state.contract.clone().unwrap() {
+    if info.sender != state.contract {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -190,7 +190,7 @@ pub fn try_receive(
     let burn = Cw20ExecuteMsg::Burn { amount };
 
     let burn_msg = WasmMsg::Execute {
-        contract_addr: state.contract.unwrap(),
+        contract_addr: state.contract,
         msg: to_binary(&burn)?,
         send: vec![],
     }
