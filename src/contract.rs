@@ -9,8 +9,6 @@ use crate::state::{State, STATE};
 
 use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
-const JUNO_COIN: &str = "ujuno";
-
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
 #[entry_point]
@@ -74,7 +72,9 @@ pub fn try_update_contract(
 }
 
 pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
-    if info.funds.iter().any(|x| x.denom.ne(JUNO_COIN)) {
+    let state = STATE.load(deps.storage)?;
+
+    if info.funds.iter().any(|x| x.denom.ne(&state.native_coin)) {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -88,7 +88,6 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
         amount: amount_to,
     };
 
-    let state = STATE.load(deps.storage)?;
     let message = WasmMsg::Execute {
         contract_addr: state.contract,
         msg: to_binary(&mint)?,
@@ -160,7 +159,7 @@ pub fn try_withdraw(
     // return funds
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.clone().into(),
-        amount: vec![Coin::new(amount.into(), JUNO_COIN)],
+        amount: vec![Coin::new(amount.into(), state.native_coin)],
     });
 
     Ok(Response {
@@ -200,7 +199,7 @@ pub fn try_receive(
     // withdraw coins
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: sender.to_owned(),
-        amount: vec![Coin::new(amount.into(), JUNO_COIN)],
+        amount: vec![Coin::new(amount.into(), state.native_coin)],
     });
 
     Ok(Response {
@@ -225,7 +224,9 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg {native_coin: "earth".into()};
+        let msg = InstantiateMsg {
+            native_coin: "earth".into(),
+        };
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
