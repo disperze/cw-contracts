@@ -4,7 +4,9 @@ use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{to_binary, OwnedDeps, Querier, QuerierResult, SystemResult, Uint128};
 use cw20::{AllowanceResponse, Expiration};
 
-pub fn mock_dependencies_allowance(allowance: Uint128) -> OwnedDeps<MockStorage, MockApi, MyMockQuerier> {
+pub fn mock_dependencies_allowance(
+    allowance: Uint128,
+) -> OwnedDeps<MockStorage, MockApi, MyMockQuerier> {
     OwnedDeps {
         storage: MockStorage::default(),
         api: MockApi::default(),
