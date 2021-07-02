@@ -4,10 +4,14 @@
   "type": "object",
   "required": [
     "contract",
+    "native_coin",
     "owner"
   ],
   "properties": {
     "contract": {
+      "type": "string"
+    },
+    "native_coin": {
       "type": "string"
     },
     "owner": {

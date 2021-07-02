@@ -8,6 +8,7 @@ use cw_storage_plus::Item;
 pub struct State {
     pub owner: Addr,
     pub contract: String,
+    pub native_coin: String,
 }
 
 pub const STATE: Item<State> = Item::new("state");

@@ -5,7 +5,9 @@ use cosmwasm_std::Uint128;
 use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InstantiateMsg {}
+pub struct InstantiateMsg {
+    pub native_coin: String,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -18,4 +20,10 @@ pub enum ExecuteMsg {
     SetContract { contract: String },
     /// Only with "approval" extension. Receive tokens from cw20 contract and withdraw wrapped tokens.
     Receive(Cw20ReceiveMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    Cw20Info {}
 }
