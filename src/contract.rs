@@ -324,4 +324,42 @@ mod tests {
         let res = try_withdraw(deps.as_mut(), env, info, 4u8.into()).unwrap();
         assert_eq!(3, res.messages.len());
     }
+
+    #[test]
+    fn receive() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            native_coin: "juno".into(),
+        };
+        let info = mock_info("creator", &[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // set cw20 contract
+        let info = mock_info("creator", &[]);
+        let cw20_contract: String = "cw20:contract".into();
+        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // withdraw
+        let info = mock_info("cw20:contract_anyone", &[]);
+        let msg = Cw20ReceiveMsg {
+            amount: 4u8.into(),
+            sender: "owner".into(),
+            msg: to_binary("").unwrap(),
+        };
+
+        let err = try_receive(deps.as_mut(), info, msg.clone()).unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("unexpected error: {:?}", e),
+        }
+
+        let info = mock_info("cw20:contract", &[]);
+        let res = try_receive(deps.as_mut(), info, msg).unwrap();
+        assert_eq!(2, res.messages.len());
+    }
 }
