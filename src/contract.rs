@@ -233,25 +233,98 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::coins;
+    use crate::mock::mock_dependencies_allowance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coins, from_binary};
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            native_coin: "earth".into(),
+            native_coin: "inca".into(),
         };
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let info = mock_info("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        // let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        // let value: CountResponse = from_binary(&res).unwrap();
-        // assert_eq!(17, value.count);
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::Info {}).unwrap();
+        let value: InfoResponse = from_binary(&res).unwrap();
+        assert_eq!("inca", value.native_coin);
+        assert_eq!(true, value.cw20_contract.is_empty());
+    }
+
+    #[test]
+    fn deposit() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            native_coin: "juno".into(),
+        };
+        let info = mock_info("creator", &[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // set cw20 contract
+        let info = mock_info("creator", &[]);
+        let cw20_contract: String = "juno145tr".into();
+        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // deposit invalid coin
+        let info = mock_info("anyone", &coins(10, "btc"));
+        let err = try_deposit(deps.as_mut(), info).unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("unexpected error: {:?}", e),
+        }
+
+        // valid coin
+        let info = mock_info("creator", &coins(10, "juno"));
+        let res = try_deposit(deps.as_mut(), info).unwrap();
+        assert_eq!(res.messages.len(), 1);
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_contract,
+                msg: to_binary(&Cw20ExecuteMsg::Mint {
+                    recipient: "creator".into(),
+                    amount: 10u8.into(),
+                })
+                .unwrap(),
+                send: vec![]
+            })
+        );
+    }
+
+    #[test]
+    fn withdraw() {
+        let mut deps = mock_dependencies_allowance(10u8.into());
+
+        let msg = InstantiateMsg {
+            native_coin: "juno".into(),
+        };
+        let info = mock_info("creator", &[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // set cw20 contract
+        let info = mock_info("creator", &[]);
+        let cw20_contract: String = "juno145tr".into();
+        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // withdraw
+        let info = mock_info("creator", &[]);
+        let env = mock_env();
+        let res = try_withdraw(deps.as_mut(), env, info, 4u8.into()).unwrap();
+        assert_eq!(3, res.messages.len());
     }
 }
