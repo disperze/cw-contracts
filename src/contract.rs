@@ -1,10 +1,10 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, BankMsg, Coin, CosmosMsg, DepsMut, Env, MessageInfo, Response,
-    Uint128, WasmMsg, WasmQuery,
+    attr, entry_point, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg};
+use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
 use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
@@ -212,6 +212,22 @@ pub fn try_receive(
         ],
         data: None,
     })
+}
+
+#[entry_point]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::Info {} => to_binary(&query_ctr_info(deps)?),
+    }
+}
+
+pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
+    let info = STATE.load(deps.storage)?;
+    let res = InfoResponse {
+        cw20_contract: info.contract,
+        native_coin: info.native_coin,
+    };
+    Ok(res)
 }
 
 #[cfg(test)]
