@@ -23,17 +23,22 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.51.0
+          toolchain: stable
           target: wasm32-unknown-unknown
           override: true
+          components: llvm-tools-preview
+
+      - name: Install grcov
+        run: curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
 
       - name: Run unit tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: unit-test
-          args: --locked
+        run: |
+          cargo build --verbose
+          LLVM_PROFILE_FILE="cw-wjuno-%p-%m.profraw" cargo test --verbose
+          ./grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
+          bash <(curl -s https://codecov.io/bash) -f lcov.info
         env:
-          RUST_BACKTRACE: 1
+          RUSTFLAGS: "-Zinstrument-coverage"
 
       - name: Compile WASM contract
         uses: actions-rs/cargo@v1
@@ -54,7 +59,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.51.0
+          toolchain: stable
           override: true
           components: rustfmt, clippy
 
