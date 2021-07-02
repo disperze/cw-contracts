@@ -3,14 +3,16 @@
   "title": "State",
   "type": "object",
   "required": [
+    "contract",
+    "native_coin",
     "owner"
   ],
   "properties": {
     "contract": {
-      "type": [
-        "string",
-        "null"
-      ]
+      "type": "string"
+    },
+    "native_coin": {
+      "type": "string"
     },
     "owner": {
       "$ref": "#/definitions/Addr"

@@ -1,11 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "InstantiateMsg",
+  "title": "InfoResponse",
   "type": "object",
   "required": [
+    "cw20_contract",
     "native_coin"
   ],
   "properties": {
+    "cw20_contract": {
+      "type": "string"
+    },
     "native_coin": {
       "type": "string"
     }
