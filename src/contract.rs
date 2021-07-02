@@ -40,9 +40,7 @@ pub fn execute(
         ExecuteMsg::Deposit {} => try_deposit(deps, info),
         ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
         ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
-        ExecuteMsg::Receive {
-            0: Cw20ReceiveMsg { amount, sender, .. },
-        } => try_receive(deps, info, sender, amount),
+        ExecuteMsg::Receive(cw20msg) => try_receive(deps, info, cw20msg),
     }
 }
 
@@ -177,8 +175,7 @@ pub fn try_withdraw(
 pub fn try_receive(
     deps: DepsMut,
     info: MessageInfo,
-    sender: String,
-    amount: Uint128,
+    msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     // validate owner contract
     let state = STATE.load(deps.storage)?;
@@ -187,7 +184,7 @@ pub fn try_receive(
     }
 
     // burn coins
-    let burn = Cw20ExecuteMsg::Burn { amount };
+    let burn = Cw20ExecuteMsg::Burn { amount: msg.amount };
 
     let burn_msg = WasmMsg::Execute {
         contract_addr: state.contract,
@@ -198,8 +195,8 @@ pub fn try_receive(
 
     // withdraw coins
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
-        to_address: sender.to_owned(),
-        amount: vec![Coin::new(amount.into(), state.native_coin)],
+        to_address: msg.sender.to_owned(),
+        amount: vec![Coin::new(msg.amount.into(), state.native_coin)],
     });
 
     Ok(Response {
@@ -207,8 +204,8 @@ pub fn try_receive(
         messages: vec![burn_msg, bank_send],
         attributes: vec![
             attr("action", "receive_to_withdraw"),
-            attr("amount", amount),
-            attr("sender", sender),
+            attr("amount", msg.amount),
+            attr("sender", msg.sender),
         ],
         data: None,
     })
