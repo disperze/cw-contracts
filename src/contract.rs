@@ -255,6 +255,43 @@ mod tests {
     }
 
     #[test]
+    fn update_contract() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            native_coin: "juno".into(),
+        };
+        let info = mock_info("creator", &[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // set from anyone sender
+        let info = mock_info("anyone", &[]);
+        let cw20_contract: String = "juno145tr".into();
+        let err = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("unexpected error: {:?}", e),
+        }
+
+        // set valid contract
+        let info = mock_info("creator", &[]);
+        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // try set new contract
+        let info = mock_info("creator", &[]);
+        let cw20_contract: String = "juno531tr".into();
+        let err = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("unexpected error: {:?}", e),
+        }
+    }
+
+    #[test]
     fn deposit() {
         let mut deps = mock_dependencies(&[]);
 
