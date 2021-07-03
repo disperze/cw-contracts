@@ -186,17 +186,7 @@ pub fn try_receive(
         return Err(ContractError::Unauthorized {});
     }
 
-    // burn coins
-    let burn = Cw20ExecuteMsg::Burn { amount: msg.amount };
-
-    let burn_msg = WasmMsg::Execute {
-        contract_addr: state.contract,
-        msg: to_binary(&burn)?,
-        send: vec![],
-    }
-    .into();
-
-    // withdraw coins
+    // send native coins to user
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: msg.sender.to_owned(),
         amount: vec![Coin::new(msg.amount.into(), state.native_coin)],
@@ -204,7 +194,7 @@ pub fn try_receive(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![burn_msg, bank_send],
+        messages: vec![bank_send],
         attributes: vec![
             attr("action", "receive_to_withdraw"),
             attr("amount", msg.amount),
@@ -407,6 +397,6 @@ mod tests {
 
         let info = mock_info("cw20:contract", &[]);
         let res = try_receive(deps.as_mut(), info, msg).unwrap();
-        assert_eq!(2, res.messages.len());
+        assert_eq!(1, res.messages.len());
     }
 }
