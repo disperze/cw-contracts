@@ -16,12 +16,13 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    _msg: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
         contract: "".into(),
-        native_coin: _msg.native_coin,
+        native_coin: msg.native_coin,
+        min_mint: msg.min_mint,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -73,7 +74,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
     let state = STATE.load(deps.storage)?;
 
     if info.funds.iter().any(|x| x.denom.ne(&state.native_coin)) {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::InvalidCoin {});
     }
 
     let amount_to = info
@@ -240,6 +241,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "inca".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -260,6 +262,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -297,6 +300,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -342,6 +346,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -368,6 +373,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
