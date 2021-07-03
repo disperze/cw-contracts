@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
-use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg, BalanceResponse};
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -38,7 +38,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit {} => try_deposit(deps, info),
+        ExecuteMsg::Deposit {} => try_deposit(deps, env, info),
         ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
         ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
         ExecuteMsg::Receive(cw20msg) => try_receive(deps, info, cw20msg),
@@ -70,29 +70,57 @@ pub fn try_update_contract(
     Ok(Response::default())
 }
 
-pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
+pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
 
     if info.funds.iter().any(|x| x.denom.ne(&state.native_coin)) {
         return Err(ContractError::InvalidCoin {});
     }
 
-    let amount_to = info
+    let amount_to: Uint128 = info
         .funds
         .iter()
         .map(|x| x.amount)
         .fold(0u8.into(), |acc, amount| acc + amount);
-    let mint = Cw20ExecuteMsg::Mint {
+
+    let balance = Cw20QueryMsg::Balance {
+        address: env.contract.address.clone().into(),
+    };
+
+    let request = WasmQuery::Smart {
+        contract_addr: state.contract.to_owned(),
+        msg: to_binary(&balance)?,
+    }
+    .into();
+
+    let res: BalanceResponse = deps.querier.query(&request)?;
+    let mut msgs = vec![];
+    if amount_to > res.balance {
+        let mint_amount = amount_to.checked_sub(res.balance).unwrap();
+        let cw20msg = Cw20ExecuteMsg::Mint {
+            recipient: env.contract.address.into(),
+            amount: if mint_amount > state.min_mint { mint_amount } else { state.min_mint },
+        };
+        let msg = WasmMsg::Execute {
+            contract_addr: state.contract.to_owned(),
+            msg: to_binary(&cw20msg)?,
+            send: vec![],
+        }
+        .into();
+        msgs.push(msg);
+    }
+
+    let cw20msg = Cw20ExecuteMsg::Transfer {
         recipient: info.sender.clone().into(),
         amount: amount_to,
     };
-
-    let message = WasmMsg::Execute {
+    let msg = WasmMsg::Execute {
         contract_addr: state.contract,
-        msg: to_binary(&mint)?,
+        msg: to_binary(&cw20msg)?,
         send: vec![],
     }
     .into();
+    msgs.push(msg);
 
     let attributes = vec![
         attr("action", "deposit"),
@@ -101,7 +129,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
     ];
     Ok(Response {
         submessages: vec![],
-        messages: vec![message],
+        messages: msgs,
         attributes,
         data: None,
     })
@@ -231,7 +259,7 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::mock_dependencies_allowance;
+    use crate::mock::{mock_dependencies_allowance, mock_dependencies_cw20_balance};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
 
@@ -296,16 +324,16 @@ mod tests {
 
     #[test]
     fn deposit() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies_cw20_balance(10u8.into());
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
-            min_mint: 10000u32.into(),
+            min_mint: 5u8.into(),
         };
         let info = mock_info("creator", &[]);
-
+        let env = mock_env();
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // set cw20 contract
@@ -315,23 +343,25 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // deposit invalid coin
+        let env = mock_env();
         let info = mock_info("anyone", &coins(10, "btc"));
-        let err = try_deposit(deps.as_mut(), info).unwrap_err();
+        let err = try_deposit(deps.as_mut(), env, info).unwrap_err();
         match err {
-            ContractError::Unauthorized {} => {}
+            ContractError::InvalidCoin {} => {}
             e => panic!("unexpected error: {:?}", e),
         }
 
         // valid coin
-        let info = mock_info("creator", &coins(10, "juno"));
-        let res = try_deposit(deps.as_mut(), info).unwrap();
-        assert_eq!(res.messages.len(), 1);
+        let info = mock_info("creator", &coins(20, "juno"));
+        let env = mock_env();
+        let res = try_deposit(deps.as_mut(), env.clone(), info).unwrap();
+        assert_eq!(res.messages.len(), 2);
         assert_eq!(
             res.messages[0],
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_contract,
                 msg: to_binary(&Cw20ExecuteMsg::Mint {
-                    recipient: "creator".into(),
+                    recipient: env.contract.address.into(),
                     amount: 10u8.into(),
                 })
                 .unwrap(),
