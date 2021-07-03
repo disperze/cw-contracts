@@ -141,26 +141,10 @@ pub fn try_withdraw(
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    // check balance
-    let allowance = Cw20QueryMsg::Allowance {
-        owner: info.sender.clone().into(),
-        spender: env.contract.address.clone().into(),
-    };
-
     let state = STATE.load(deps.storage)?;
-    let request = WasmQuery::Smart {
-        contract_addr: state.contract.to_owned(),
-        msg: to_binary(&allowance)?,
-    }
-    .into();
-    let res: AllowanceResponse = deps.querier.query(&request)?;
 
-    if amount > res.allowance {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    // receive cw20 tokens
-    let burn = Cw20ExecuteMsg::TransferFrom {
+    // transfer to contract cw20 tokens
+    let transfer = Cw20ExecuteMsg::TransferFrom {
         owner: info.sender.clone().into(),
         recipient: env.contract.address.into(),
         amount,
@@ -168,22 +152,12 @@ pub fn try_withdraw(
 
     let message = WasmMsg::Execute {
         contract_addr: state.contract.to_owned(),
-        msg: to_binary(&burn)?,
+        msg: to_binary(&transfer)?,
         send: vec![],
     }
     .into();
 
-    // burn tokens
-    let burn = Cw20ExecuteMsg::Burn { amount };
-
-    let burn_msg = WasmMsg::Execute {
-        contract_addr: state.contract,
-        msg: to_binary(&burn)?,
-        send: vec![],
-    }
-    .into();
-
-    // return funds
+    // return native funds to user
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.clone().into(),
         amount: vec![Coin::new(amount.into(), state.native_coin)],
@@ -191,7 +165,7 @@ pub fn try_withdraw(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![message, burn_msg, bank_send],
+        messages: vec![message, bank_send],
         attributes: vec![
             attr("action", "withdraw"),
             attr("amount", amount),
@@ -259,7 +233,7 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::{mock_dependencies_allowance, mock_dependencies_cw20_balance};
+    use crate::mock::{mock_dependencies_cw20_balance};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
 
@@ -372,7 +346,7 @@ mod tests {
 
     #[test]
     fn withdraw() {
-        let mut deps = mock_dependencies_allowance(10u8.into());
+        let mut deps = mock_dependencies(&[Coin::new(1000u32.into(), "juno")]);
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
@@ -394,7 +368,7 @@ mod tests {
         let info = mock_info("creator", &[]);
         let env = mock_env();
         let res = try_withdraw(deps.as_mut(), env, info, 4u8.into()).unwrap();
-        assert_eq!(3, res.messages.len());
+        assert_eq!(2, res.messages.len());
     }
 
     #[test]
