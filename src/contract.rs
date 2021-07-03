@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
-use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg, BalanceResponse};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -99,7 +99,11 @@ pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
         let mint_amount = amount_to.checked_sub(res.balance).unwrap();
         let cw20msg = Cw20ExecuteMsg::Mint {
             recipient: env.contract.address.into(),
-            amount: if mint_amount > state.min_mint { mint_amount } else { state.min_mint },
+            amount: if mint_amount > state.min_mint {
+                mint_amount
+            } else {
+                state.min_mint
+            },
         };
         let msg = WasmMsg::Execute {
             contract_addr: state.contract.to_owned(),
@@ -223,7 +227,7 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::{mock_dependencies_cw20_balance};
+    use crate::mock::mock_dependencies_cw20_balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
 
