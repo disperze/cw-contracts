@@ -16,7 +16,7 @@ use cw20_base::contract::{
 };
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -46,7 +46,7 @@ pub fn instantiate(
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -164,7 +164,7 @@ pub fn try_withdraw(
     })
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Info {} => to_binary(&query_ctr_info(deps)?),
