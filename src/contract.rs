@@ -184,7 +184,7 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
+    use cosmwasm_std::{coins, from_binary, coin};
     use cw20::BalanceResponse;
 
     #[test]
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn withdraw() {
-        let mut deps = mock_dependencies(&[Coin::new(1000u32.into(), "juno")]);
+        let mut deps = mock_dependencies(&coins(1000u32.into(), "juno"));
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
@@ -281,6 +281,13 @@ mod tests {
         let amount_withdraw = 4u8;
         let res = try_withdraw(deps.as_mut(), env.clone(), info, amount_withdraw.into()).unwrap();
         assert_eq!(1, res.messages.len());
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                amount: vec![coin(amount_withdraw.into(), "juno")],
+                to_address: "creator".into(),
+            })
+        );
 
         // check balance query
         let data = query(
