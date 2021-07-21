@@ -109,7 +109,7 @@ pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
         .funds
         .iter()
         .find(|x| x.denom == state.native_coin)
-        .ok_or_else(|| ContractError::EmptyBalance {
+        .ok_or(ContractError::EmptyBalance {
             denom: state.native_coin,
         })?;
 
@@ -145,7 +145,7 @@ pub fn try_withdraw(
 ) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
 
-    execute_burn(deps, env.clone(), info.clone(), amount)?;
+    execute_burn(deps, env, info.clone(), amount)?;
 
     // return native coin
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
