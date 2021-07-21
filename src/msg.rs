@@ -17,10 +17,6 @@ pub enum ExecuteMsg {
     Deposit {},
     /// Withdraw your wrapped token previous allowance
     Withdraw { amount: Uint128 },
-    /// Only with the "owner" extension. Update cw20 smart-contract one time
-    SetContract { contract: String },
-    /// Only with "approval" extension. Receive tokens from cw20 contract and withdraw wrapped tokens.
-    Receive(Cw20ReceiveMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -31,6 +27,5 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InfoResponse {
-    pub cw20_contract: String,
     pub native_coin: String,
 }

@@ -20,9 +20,7 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
-        contract: "".into(),
         native_coin: msg.native_coin,
-        min_mint: msg.min_mint,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -40,34 +38,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::Deposit {} => try_deposit(deps, env, info),
         ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
-        ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
-        ExecuteMsg::Receive(cw20msg) => try_receive(deps, info, cw20msg),
     }
-}
-
-pub fn try_update_contract(
-    deps: DepsMut,
-    info: MessageInfo,
-    contract: String,
-) -> Result<Response, ContractError> {
-    let state = STATE.load(deps.storage)?;
-
-    if info.sender != state.owner {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    if !state.contract.is_empty() {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    deps.api.addr_validate(&contract)?;
-
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.contract = contract;
-        Ok(state)
-    })?;
-
-    Ok(Response::default())
 }
 
 pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
@@ -179,35 +150,6 @@ pub fn try_withdraw(
     })
 }
 
-pub fn try_receive(
-    deps: DepsMut,
-    info: MessageInfo,
-    msg: Cw20ReceiveMsg,
-) -> Result<Response, ContractError> {
-    // validate owner contract
-    let state = STATE.load(deps.storage)?;
-    if info.sender != state.contract {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    // send native coins to user
-    let bank_send = CosmosMsg::Bank(BankMsg::Send {
-        to_address: msg.sender.to_owned(),
-        amount: vec![Coin::new(msg.amount.into(), state.native_coin)],
-    });
-
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![bank_send],
-        attributes: vec![
-            attr("action", "receive_to_withdraw"),
-            attr("amount", msg.amount),
-            attr("sender", msg.sender),
-        ],
-        data: None,
-    })
-}
-
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -218,7 +160,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
     let info = STATE.load(deps.storage)?;
     let res = InfoResponse {
-        cw20_contract: info.contract,
         native_coin: info.native_coin,
     };
     Ok(res)
@@ -249,45 +190,6 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), QueryMsg::Info {}).unwrap();
         let value: InfoResponse = from_binary(&res).unwrap();
         assert_eq!("inca", value.native_coin);
-        assert_eq!(true, value.cw20_contract.is_empty());
-    }
-
-    #[test]
-    fn update_contract() {
-        let mut deps = mock_dependencies(&[]);
-
-        let msg = InstantiateMsg {
-            native_coin: "juno".into(),
-            min_mint: 10000u32.into(),
-        };
-        let info = mock_info("creator", &[]);
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // set from anyone sender
-        let info = mock_info("anyone", &[]);
-        let cw20_contract: String = "juno145tr".into();
-        let err = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("unexpected error: {:?}", e),
-        }
-
-        // set valid contract
-        let info = mock_info("creator", &[]);
-        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // try set new contract
-        let info = mock_info("creator", &[]);
-        let cw20_contract: String = "juno531tr".into();
-        let err = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("unexpected error: {:?}", e),
-        }
     }
 
     #[test]
@@ -302,12 +204,6 @@ mod tests {
         let env = mock_env();
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // set cw20 contract
-        let info = mock_info("creator", &[]);
-        let cw20_contract: String = "juno145tr".into();
-        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
         assert_eq!(0, res.messages.len());
 
         // deposit invalid coin
@@ -352,55 +248,10 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // set cw20 contract
-        let info = mock_info("creator", &[]);
-        let cw20_contract: String = "juno145tr".into();
-        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
-        assert_eq!(0, res.messages.len());
-
         // withdraw
         let info = mock_info("creator", &[]);
         let env = mock_env();
         let res = try_withdraw(deps.as_mut(), env, info, 4u8.into()).unwrap();
         assert_eq!(2, res.messages.len());
-    }
-
-    #[test]
-    fn receive() {
-        let mut deps = mock_dependencies(&[]);
-
-        let msg = InstantiateMsg {
-            native_coin: "juno".into(),
-            min_mint: 10000u32.into(),
-        };
-        let info = mock_info("creator", &[]);
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // set cw20 contract
-        let info = mock_info("creator", &[]);
-        let cw20_contract: String = "cw20:contract".into();
-        let res = try_update_contract(deps.as_mut(), info, cw20_contract.to_owned()).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // withdraw
-        let info = mock_info("cw20:contract_anyone", &[]);
-        let msg = Cw20ReceiveMsg {
-            amount: 4u8.into(),
-            sender: "owner".into(),
-            msg: to_binary("").unwrap(),
-        };
-
-        let err = try_receive(deps.as_mut(), info, msg.clone()).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("unexpected error: {:?}", e),
-        }
-
-        let info = mock_info("cw20:contract", &[]);
-        let res = try_receive(deps.as_mut(), info, msg).unwrap();
-        assert_eq!(1, res.messages.len());
     }
 }
