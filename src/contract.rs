@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
-use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -16,12 +16,13 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    _msg: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
         contract: "".into(),
-        native_coin: _msg.native_coin,
+        native_coin: msg.native_coin,
+        min_mint: msg.min_mint,
     };
     STATE.save(deps.storage, &state)?;
 
@@ -37,7 +38,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Deposit {} => try_deposit(deps, info),
+        ExecuteMsg::Deposit {} => try_deposit(deps, env, info),
         ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
         ExecuteMsg::SetContract { contract } => try_update_contract(deps, info, contract),
         ExecuteMsg::Receive(cw20msg) => try_receive(deps, info, cw20msg),
@@ -69,29 +70,61 @@ pub fn try_update_contract(
     Ok(Response::default())
 }
 
-pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError> {
+pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
 
     if info.funds.iter().any(|x| x.denom.ne(&state.native_coin)) {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::InvalidCoin {});
     }
 
-    let amount_to = info
+    let amount_to: Uint128 = info
         .funds
         .iter()
         .map(|x| x.amount)
         .fold(0u8.into(), |acc, amount| acc + amount);
-    let mint = Cw20ExecuteMsg::Mint {
+
+    let balance = Cw20QueryMsg::Balance {
+        address: env.contract.address.clone().into(),
+    };
+
+    let request = WasmQuery::Smart {
+        contract_addr: state.contract.to_owned(),
+        msg: to_binary(&balance)?,
+    }
+    .into();
+
+    let res: BalanceResponse = deps.querier.query(&request)?;
+    let mut msgs = vec![];
+    if amount_to > res.balance {
+        let mint_amount = amount_to.checked_sub(res.balance).unwrap();
+        let cw20msg = Cw20ExecuteMsg::Mint {
+            recipient: env.contract.address.into(),
+            amount: if mint_amount > state.min_mint {
+                mint_amount
+            } else {
+                state.min_mint
+            },
+        };
+        let msg = WasmMsg::Execute {
+            contract_addr: state.contract.to_owned(),
+            msg: to_binary(&cw20msg)?,
+            send: vec![],
+        }
+        .into();
+        msgs.push(msg);
+    }
+
+    let cw20msg = Cw20ExecuteMsg::Transfer {
         recipient: info.sender.clone().into(),
         amount: amount_to,
     };
-
-    let message = WasmMsg::Execute {
+    let msg = WasmMsg::Execute {
         contract_addr: state.contract,
-        msg: to_binary(&mint)?,
+        msg: to_binary(&cw20msg)?,
         send: vec![],
     }
     .into();
+    msgs.push(msg);
 
     let attributes = vec![
         attr("action", "deposit"),
@@ -100,7 +133,7 @@ pub fn try_deposit(deps: DepsMut, info: MessageInfo) -> Result<Response, Contrac
     ];
     Ok(Response {
         submessages: vec![],
-        messages: vec![message],
+        messages: msgs,
         attributes,
         data: None,
     })
@@ -112,26 +145,10 @@ pub fn try_withdraw(
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    // check balance
-    let allowance = Cw20QueryMsg::Allowance {
-        owner: info.sender.clone().into(),
-        spender: env.contract.address.clone().into(),
-    };
-
     let state = STATE.load(deps.storage)?;
-    let request = WasmQuery::Smart {
-        contract_addr: state.contract.to_owned(),
-        msg: to_binary(&allowance)?,
-    }
-    .into();
-    let res: AllowanceResponse = deps.querier.query(&request)?;
 
-    if amount > res.allowance {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    // receive cw20 tokens
-    let burn = Cw20ExecuteMsg::TransferFrom {
+    // transfer to contract cw20 tokens
+    let transfer = Cw20ExecuteMsg::TransferFrom {
         owner: info.sender.clone().into(),
         recipient: env.contract.address.into(),
         amount,
@@ -139,22 +156,12 @@ pub fn try_withdraw(
 
     let message = WasmMsg::Execute {
         contract_addr: state.contract.to_owned(),
-        msg: to_binary(&burn)?,
+        msg: to_binary(&transfer)?,
         send: vec![],
     }
     .into();
 
-    // burn tokens
-    let burn = Cw20ExecuteMsg::Burn { amount };
-
-    let burn_msg = WasmMsg::Execute {
-        contract_addr: state.contract,
-        msg: to_binary(&burn)?,
-        send: vec![],
-    }
-    .into();
-
-    // return funds
+    // return native funds to user
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.clone().into(),
         amount: vec![Coin::new(amount.into(), state.native_coin)],
@@ -162,7 +169,7 @@ pub fn try_withdraw(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![message, burn_msg, bank_send],
+        messages: vec![message, bank_send],
         attributes: vec![
             attr("action", "withdraw"),
             attr("amount", amount),
@@ -183,17 +190,7 @@ pub fn try_receive(
         return Err(ContractError::Unauthorized {});
     }
 
-    // burn coins
-    let burn = Cw20ExecuteMsg::Burn { amount: msg.amount };
-
-    let burn_msg = WasmMsg::Execute {
-        contract_addr: state.contract,
-        msg: to_binary(&burn)?,
-        send: vec![],
-    }
-    .into();
-
-    // withdraw coins
+    // send native coins to user
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: msg.sender.to_owned(),
         amount: vec![Coin::new(msg.amount.into(), state.native_coin)],
@@ -201,7 +198,7 @@ pub fn try_receive(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![burn_msg, bank_send],
+        messages: vec![bank_send],
         attributes: vec![
             attr("action", "receive_to_withdraw"),
             attr("amount", msg.amount),
@@ -230,7 +227,7 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::mock_dependencies_allowance;
+    use crate::mock::mock_dependencies_cw20_balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
 
@@ -240,6 +237,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "inca".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -260,6 +258,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -293,15 +292,16 @@ mod tests {
 
     #[test]
     fn deposit() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies_cw20_balance(10u8.into());
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 5u8.into(),
         };
         let info = mock_info("creator", &[]);
-
+        let env = mock_env();
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // set cw20 contract
@@ -311,23 +311,25 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // deposit invalid coin
+        let env = mock_env();
         let info = mock_info("anyone", &coins(10, "btc"));
-        let err = try_deposit(deps.as_mut(), info).unwrap_err();
+        let err = try_deposit(deps.as_mut(), env, info).unwrap_err();
         match err {
-            ContractError::Unauthorized {} => {}
+            ContractError::InvalidCoin {} => {}
             e => panic!("unexpected error: {:?}", e),
         }
 
         // valid coin
-        let info = mock_info("creator", &coins(10, "juno"));
-        let res = try_deposit(deps.as_mut(), info).unwrap();
-        assert_eq!(res.messages.len(), 1);
+        let info = mock_info("creator", &coins(20, "juno"));
+        let env = mock_env();
+        let res = try_deposit(deps.as_mut(), env.clone(), info).unwrap();
+        assert_eq!(res.messages.len(), 2);
         assert_eq!(
             res.messages[0],
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_contract,
                 msg: to_binary(&Cw20ExecuteMsg::Mint {
-                    recipient: "creator".into(),
+                    recipient: env.contract.address.into(),
                     amount: 10u8.into(),
                 })
                 .unwrap(),
@@ -338,10 +340,11 @@ mod tests {
 
     #[test]
     fn withdraw() {
-        let mut deps = mock_dependencies_allowance(10u8.into());
+        let mut deps = mock_dependencies(&[Coin::new(1000u32.into(), "juno")]);
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -359,7 +362,7 @@ mod tests {
         let info = mock_info("creator", &[]);
         let env = mock_env();
         let res = try_withdraw(deps.as_mut(), env, info, 4u8.into()).unwrap();
-        assert_eq!(3, res.messages.len());
+        assert_eq!(2, res.messages.len());
     }
 
     #[test]
@@ -368,6 +371,7 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
+            min_mint: 10000u32.into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -397,6 +401,6 @@ mod tests {
 
         let info = mock_info("cw20:contract", &[]);
         let res = try_receive(deps.as_mut(), info, msg).unwrap();
-        assert_eq!(2, res.messages.len());
+        assert_eq!(1, res.messages.len());
     }
 }

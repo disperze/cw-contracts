@@ -2,27 +2,26 @@
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{to_binary, OwnedDeps, Querier, QuerierResult, SystemResult, Uint128};
-use cw20::{AllowanceResponse, Expiration};
+use cw20::BalanceResponse;
 
-pub fn mock_dependencies_allowance(
-    allowance: Uint128,
-) -> OwnedDeps<MockStorage, MockApi, MyMockQuerier> {
+pub fn mock_dependencies_cw20_balance(
+    balance: Uint128,
+) -> OwnedDeps<MockStorage, MockApi, BalMockQuerier> {
     OwnedDeps {
         storage: MockStorage::default(),
         api: MockApi::default(),
-        querier: MyMockQuerier { amount: allowance },
+        querier: BalMockQuerier { amount: balance },
     }
 }
 
-pub struct MyMockQuerier {
+pub struct BalMockQuerier {
     amount: Uint128,
 }
 
-impl Querier for MyMockQuerier {
+impl Querier for BalMockQuerier {
     fn raw_query(&self, _: &[u8]) -> QuerierResult {
-        let allowance_res = AllowanceResponse {
-            allowance: self.amount,
-            expires: Expiration::Never {},
+        let allowance_res = BalanceResponse {
+            balance: self.amount,
         };
 
         SystemResult::Ok(to_binary(&allowance_res).into())
