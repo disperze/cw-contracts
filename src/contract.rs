@@ -117,7 +117,7 @@ pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
         sender: env.contract.address.clone(),
         funds: vec![],
     };
-    execute_mint(deps, env, sub_info, info.sender.into(), deposit.amount)?;
+    execute_mint(deps, env, sub_info, info.sender.clone().into(), deposit.amount)?;
 
     let attributes = vec![
         attr("action", "deposit"),
@@ -183,7 +183,6 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::mock_dependencies_cw20_balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
     use cw20::BalanceResponse;
@@ -207,7 +206,7 @@ mod tests {
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::Info {}).unwrap();
         let value: InfoResponse = from_binary(&res).unwrap();
-        assert_eq!("inca", value.native_coin);
+        assert_eq!("juno", value.native_coin);
     }
 
     #[test]
@@ -231,7 +230,7 @@ mod tests {
         let info = mock_info("anyone", &coins(10, "btc"));
         let err = try_deposit(deps.as_mut(), env, info).unwrap_err();
         match err {
-            ContractError::InvalidCoin {} => {}
+            ContractError::EmptyBalance {..} => {}
             e => panic!("unexpected error: {:?}", e),
         }
 
@@ -270,10 +269,17 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
+        // deposit
+        let env = mock_env();
+        let amount_deposit = 5u8;
+        let info = mock_info("creator", &coins(amount_deposit.into(), "juno"));
+        let res = try_deposit(deps.as_mut(), env.clone(), info).unwrap();
+        assert_eq!(res.messages.len(), 0);
+
         // withdraw
         let info = mock_info("creator", &[]);
-        let env = mock_env();
-        let res = try_withdraw(deps.as_mut(), env.clone(), info, 4u8.into()).unwrap();
+        let amount_withdraw = 4u8;
+        let res = try_withdraw(deps.as_mut(), env.clone(), info, amount_withdraw.into()).unwrap();
         assert_eq!(1, res.messages.len());
 
         // check balance query
@@ -286,6 +292,6 @@ mod tests {
         )
             .unwrap();
         let response: BalanceResponse = from_binary(&data).unwrap();
-        assert_eq!(response.balance, Uint128(4));
+        assert_eq!(response.balance, (amount_deposit - amount_withdraw).into());
     }
 }
