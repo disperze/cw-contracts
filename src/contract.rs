@@ -1,13 +1,12 @@
 use cosmwasm_std::{
     attr, entry_point, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128, WasmMsg, WasmQuery,
+    MessageInfo, Response, StdResult, Uint128,
 };
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
-use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -20,7 +19,7 @@ use cw20_base::state::{TokenInfo, TOKEN_INFO, MinterData};
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
@@ -106,69 +105,29 @@ pub fn execute(
 pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
 
-    if info.funds.iter().any(|x| x.denom.ne(&state.native_coin)) {
-        return Err(ContractError::InvalidCoin {});
-    }
-
-    let amount_to: Uint128 = info
+    let deposit = info
         .funds
         .iter()
-        .map(|x| x.amount)
-        .fold(0u8.into(), |acc, amount| acc + amount);
+        .find(|x| x.denom == state.native_coin)
+        .ok_or_else(|| ContractError::EmptyBalance {
+            denom: state.native_coin,
+        })?;
 
-    let balance = Cw20QueryMsg::Balance {
-        address: env.contract.address.clone().into(),
+    let sub_info = MessageInfo {
+        sender: env.contract.address.clone(),
+        funds: vec![],
     };
-
-    let request = WasmQuery::Smart {
-        contract_addr: state.contract.to_owned(),
-        msg: to_binary(&balance)?,
-    }
-    .into();
-
-    let res: BalanceResponse = deps.querier.query(&request)?;
-    let mut msgs = vec![];
-    if amount_to > res.balance {
-        let mint_amount = amount_to.checked_sub(res.balance).unwrap();
-        let cw20msg = Cw20ExecuteMsg::Mint {
-            recipient: env.contract.address.into(),
-            amount: if mint_amount > state.min_mint {
-                mint_amount
-            } else {
-                state.min_mint
-            },
-        };
-        let msg = WasmMsg::Execute {
-            contract_addr: state.contract.to_owned(),
-            msg: to_binary(&cw20msg)?,
-            send: vec![],
-        }
-        .into();
-        msgs.push(msg);
-    }
-
-    let cw20msg = Cw20ExecuteMsg::Transfer {
-        recipient: info.sender.clone().into(),
-        amount: amount_to,
-    };
-    let msg = WasmMsg::Execute {
-        contract_addr: state.contract,
-        msg: to_binary(&cw20msg)?,
-        send: vec![],
-    }
-    .into();
-    msgs.push(msg);
+    execute_mint(deps, env, sub_info, info.sender.into(), deposit.amount)?;
 
     let attributes = vec![
         attr("action", "deposit"),
-        attr("amount", amount_to),
+        attr("amount", deposit.amount),
         attr("sender", info.sender),
     ];
+
     Ok(Response {
-        submessages: vec![],
-        messages: msgs,
         attributes,
-        data: None,
+        ..Response::default()
     })
 }
 
@@ -180,35 +139,22 @@ pub fn try_withdraw(
 ) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
 
-    // transfer to contract cw20 tokens
-    let transfer = Cw20ExecuteMsg::TransferFrom {
-        owner: info.sender.clone().into(),
-        recipient: env.contract.address.into(),
-        amount,
-    };
+    execute_burn(deps, env.clone(), info.clone(), amount)?;
 
-    let message = WasmMsg::Execute {
-        contract_addr: state.contract.to_owned(),
-        msg: to_binary(&transfer)?,
-        send: vec![],
-    }
-    .into();
-
-    // return native funds to user
+    // return native coin
     let bank_send = CosmosMsg::Bank(BankMsg::Send {
         to_address: info.sender.clone().into(),
         amount: vec![Coin::new(amount.into(), state.native_coin)],
     });
 
     Ok(Response {
-        submessages: vec![],
-        messages: vec![message, bank_send],
+        messages: vec![bank_send],
         attributes: vec![
             attr("action", "withdraw"),
             attr("amount", amount),
             attr("sender", info.sender),
         ],
-        data: None,
+        ..Response::default()
     })
 }
 
@@ -240,6 +186,7 @@ mod tests {
     use crate::mock::mock_dependencies_cw20_balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
+    use cw20::BalanceResponse;
 
     #[test]
     fn proper_initialization() {
@@ -265,7 +212,7 @@ mod tests {
 
     #[test]
     fn deposit() {
-        let mut deps = mock_dependencies_cw20_balance(10u8.into());
+        let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
@@ -292,19 +239,19 @@ mod tests {
         let info = mock_info("creator", &coins(20, "juno"));
         let env = mock_env();
         let res = try_deposit(deps.as_mut(), env.clone(), info).unwrap();
-        assert_eq!(res.messages.len(), 2);
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: cw20_contract,
-                msg: to_binary(&Cw20ExecuteMsg::Mint {
-                    recipient: env.contract.address.into(),
-                    amount: 10u8.into(),
-                })
-                .unwrap(),
-                send: vec![]
-            })
-        );
+        assert_eq!(res.messages.len(), 0);
+
+        // check balance query
+        let data = query(
+            deps.as_ref(),
+            env,
+            QueryMsg::Balance {
+                address: String::from("creator"),
+            },
+        )
+            .unwrap();
+        let response: BalanceResponse = from_binary(&data).unwrap();
+        assert_eq!(response.balance, Uint128(20));
     }
 
     #[test]
@@ -326,7 +273,19 @@ mod tests {
         // withdraw
         let info = mock_info("creator", &[]);
         let env = mock_env();
-        let res = try_withdraw(deps.as_mut(), env, info, 4u8.into()).unwrap();
-        assert_eq!(2, res.messages.len());
+        let res = try_withdraw(deps.as_mut(), env.clone(), info, 4u8.into()).unwrap();
+        assert_eq!(1, res.messages.len());
+
+        // check balance query
+        let data = query(
+            deps.as_ref(),
+            env,
+            QueryMsg::Balance {
+                address: String::from("creator"),
+            },
+        )
+            .unwrap();
+        let response: BalanceResponse = from_binary(&data).unwrap();
+        assert_eq!(response.balance, Uint128(4));
     }
 }
