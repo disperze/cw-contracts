@@ -8,6 +8,13 @@ use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20_base::allowances::{
+    execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
+    execute_transfer_from, query_allowance,
+};
+use cw20_base::contract::{
+    execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_token_info,
+};
 use cw20_base::state::{TokenInfo, TOKEN_INFO, MinterData};
 
 #[entry_point]
@@ -50,6 +57,49 @@ pub fn execute(
     match msg {
         ExecuteMsg::Deposit {} => try_deposit(deps, env, info),
         ExecuteMsg::Withdraw { amount } => try_withdraw(deps, env, info, amount),
+
+        // cw20 standard
+        ExecuteMsg::Transfer { recipient, amount } => {
+            Ok(execute_transfer(deps, env, info, recipient, amount)?)
+        }
+        ExecuteMsg::Burn { amount } => Ok(execute_burn(deps, env, info, amount)?),
+        ExecuteMsg::Send {
+            contract,
+            amount,
+            msg,
+        } => Ok(execute_send(deps, env, info, contract, amount, msg)?),
+        ExecuteMsg::IncreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => Ok(execute_increase_allowance(
+            deps, env, info, spender, amount, expires,
+        )?),
+        ExecuteMsg::DecreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => Ok(execute_decrease_allowance(
+            deps, env, info, spender, amount, expires,
+        )?),
+        ExecuteMsg::TransferFrom {
+            owner,
+            recipient,
+            amount,
+        } => Ok(execute_transfer_from(
+            deps, env, info, owner, recipient, amount,
+        )?),
+        ExecuteMsg::BurnFrom { owner, amount } => {
+            Ok(execute_burn_from(deps, env, info, owner, amount)?)
+        }
+        ExecuteMsg::SendFrom {
+            owner,
+            contract,
+            amount,
+            msg,
+        } => Ok(execute_send_from(
+            deps, env, info, owner, contract, amount, msg,
+        )?),
     }
 }
 
@@ -166,6 +216,13 @@ pub fn try_withdraw(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Info {} => to_binary(&query_ctr_info(deps)?),
+
+        // cw20 standard
+        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
+        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        QueryMsg::Allowance { owner, spender } => {
+            to_binary(&query_allowance(deps, owner, spender)?)
+        }
     }
 }
 
