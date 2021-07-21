@@ -8,9 +8,8 @@ use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
 use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20_base::state::{TokenInfo, TOKEN_INFO, MinterData};
 
-// Note, you can use StdResult in some functions where you do not
-// make use of the custom errors
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -18,6 +17,19 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    // store token info
+    let data = TokenInfo {
+        name: msg.name,
+        symbol: msg.symbol,
+        decimals: msg.decimals,
+        total_supply: Uint128(0),
+        mint: Some(MinterData {
+            minter: env.contract.address,
+            cap: None,
+        }),
+    };
+    TOKEN_INFO.save(deps.storage, &data)?;
+
     let state = State {
         owner: info.sender,
         native_coin: msg.native_coin,
@@ -177,8 +189,10 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            native_coin: "inca".into(),
-            min_mint: 10000u32.into(),
+            native_coin: "juno".into(),
+            name: "wjuno".into(),
+            decimals: 6.into(),
+            symbol: "WJUNO".into(),
         };
         let info = mock_info("creator", &[]);
 
@@ -198,7 +212,9 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
-            min_mint: 5u8.into(),
+            name: "wjuno".into(),
+            decimals: 6.into(),
+            symbol: "WJUNO".into(),
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -240,7 +256,9 @@ mod tests {
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
-            min_mint: 10000u32.into(),
+            name: "wjuno".into(),
+            decimals: 6.into(),
+            symbol: "WJUNO".into(),
         };
         let info = mock_info("creator", &[]);
 
