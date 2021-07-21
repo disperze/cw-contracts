@@ -2,7 +2,7 @@
 
 use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{to_binary, OwnedDeps, Querier, QuerierResult, SystemResult, Uint128};
-use cw20::{BalanceResponse};
+use cw20::BalanceResponse;
 
 pub fn mock_dependencies_cw20_balance(
     balance: Uint128,
