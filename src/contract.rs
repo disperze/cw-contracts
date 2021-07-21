@@ -14,7 +14,7 @@ use cw20_base::allowances::{
 use cw20_base::contract::{
     execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_token_info,
 };
-use cw20_base::state::{TokenInfo, TOKEN_INFO, MinterData};
+use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 #[entry_point]
 pub fn instantiate(
@@ -117,7 +117,13 @@ pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
         sender: env.contract.address.clone(),
         funds: vec![],
     };
-    execute_mint(deps, env, sub_info, info.sender.clone().into(), deposit.amount)?;
+    execute_mint(
+        deps,
+        env,
+        sub_info,
+        info.sender.clone().into(),
+        deposit.amount,
+    )?;
 
     let attributes = vec![
         attr("action", "deposit"),
@@ -184,7 +190,7 @@ pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, coin};
+    use cosmwasm_std::{coin, coins, from_binary};
     use cw20::BalanceResponse;
 
     #[test]
@@ -230,7 +236,7 @@ mod tests {
         let info = mock_info("anyone", &coins(10, "btc"));
         let err = try_deposit(deps.as_mut(), env, info).unwrap_err();
         match err {
-            ContractError::EmptyBalance {..} => {}
+            ContractError::EmptyBalance { .. } => {}
             e => panic!("unexpected error: {:?}", e),
         }
 
@@ -248,7 +254,7 @@ mod tests {
                 address: String::from("creator"),
             },
         )
-            .unwrap();
+        .unwrap();
         let response: BalanceResponse = from_binary(&data).unwrap();
         assert_eq!(response.balance, Uint128(20));
     }
@@ -297,7 +303,7 @@ mod tests {
                 address: String::from("creator"),
             },
         )
-            .unwrap();
+        .unwrap();
         let response: BalanceResponse = from_binary(&data).unwrap();
         assert_eq!(response.balance, (amount_deposit - amount_withdraw).into());
     }
