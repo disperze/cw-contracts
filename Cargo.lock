@@ -569,7 +569,7 @@ checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 
 [[package]]
 name = "wjuno"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
