@@ -73,20 +73,32 @@ pub enum ExecuteMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    /// Return info contract (native coin)
     Info {},
 
     // Implements CW20
     /// CW20. Returns the current balance of the given address, 0 if unset.
-    Balance {
-        address: String,
-    },
+    Balance { address: String },
     /// CW20. Returns metadata on the contract - name, decimals, supply, etc.
     TokenInfo {},
+    /// CW20. Only with "mintable" extension.
+    /// Returns who can mint and how much.
+    Minter {},
     /// CW20 "allowance" extension.
     /// Returns how much spender can use from owner account, 0 if unset.
-    Allowance {
+    Allowance { owner: String, spender: String },
+    /// CW20. Only with "enumerable" extension (and "allowances")
+    /// Returns all allowances this owner has approved. Supports pagination.
+    AllAllowances {
         owner: String,
-        spender: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// CW20. Only with "enumerable" extension
+    /// Returns all accounts that have balances. Supports pagination.
+    AllAccounts {
+        start_after: Option<String>,
+        limit: Option<u32>,
     },
 }
 
