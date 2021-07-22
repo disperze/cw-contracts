@@ -3,8 +3,11 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cw20::{AllowanceResponse, BalanceResponse, TokenInfoResponse};
-use wjuno::msg::{ExecuteMsg, InfoResponse, InstantiateMsg};
+use cw20::{
+    AllAccountsResponse, AllAllowancesResponse, AllowanceResponse, BalanceResponse, MinterResponse,
+    TokenInfoResponse,
+};
+use wjuno::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use wjuno::state::State;
 
 fn main() {
@@ -15,10 +18,14 @@ fn main() {
 
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
+    export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
     export_schema(&schema_for!(InfoResponse), &out_dir);
     // cw20
-    export_schema(&schema_for!(AllowanceResponse), &out_dir);
     export_schema(&schema_for!(BalanceResponse), &out_dir);
     export_schema(&schema_for!(TokenInfoResponse), &out_dir);
+    export_schema(&schema_for!(MinterResponse), &out_dir);
+    export_schema(&schema_for!(AllowanceResponse), &out_dir);
+    export_schema(&schema_for!(AllAllowancesResponse), &out_dir);
+    export_schema(&schema_for!(AllAccountsResponse), &out_dir);
 }
