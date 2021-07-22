@@ -78,9 +78,7 @@ pub enum QueryMsg {
 
     // Implements CW20
     /// CW20. Returns the current balance of the given address, 0 if unset.
-    Balance {
-        address: String,
-    },
+    Balance { address: String },
     /// CW20. Returns metadata on the contract - name, decimals, supply, etc.
     TokenInfo {},
     /// CW20. Only with "mintable" extension.
@@ -88,10 +86,7 @@ pub enum QueryMsg {
     Minter {},
     /// CW20 "allowance" extension.
     /// Returns how much spender can use from owner account, 0 if unset.
-    Allowance {
-        owner: String,
-        spender: String,
-    },
+    Allowance { owner: String, spender: String },
     /// CW20. Only with "enumerable" extension (and "allowances")
     /// Returns all allowances this owner has approved. Supports pagination.
     AllAllowances {
