@@ -7,6 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
+use cw2::set_contract_version;
 use cw20_base::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -18,6 +19,10 @@ use cw20_base::contract::{
 use cw20_base::enumerable::{query_all_accounts, query_all_allowances};
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw-wjuno";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -25,6 +30,8 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
     // store token info
     let data = TokenInfo {
         name: msg.name,
