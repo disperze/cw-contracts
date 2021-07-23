@@ -1,6 +1,6 @@
 [package]
 name = "cw-wjuno"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Giancarlos Salas <giansalex@gmail.com>"]
 edition = "2018"
 description = "CosmWasm contract for wrapped JUNO into CW20"
