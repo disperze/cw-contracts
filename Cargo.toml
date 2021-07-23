@@ -1,5 +1,5 @@
 [package]
-name = "wjuno"
+name = "cw-wjuno"
 version = "0.4.1"
 authors = ["Giancarlos Salas <giansalex@gmail.com>"]
 edition = "2018"
@@ -38,6 +38,7 @@ library = []
 cosmwasm-std = { version = "0.14.0" }
 cosmwasm-storage = { version = "0.14.0" }
 cw-storage-plus = "0.6.2"
+cw2 = "0.6.2"
 cw20 = "0.6.2"
 cw20-base = { version = "0.6.2", features = ["library"]}
 schemars = "0.8.1"

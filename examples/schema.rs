@@ -7,8 +7,8 @@ use cw20::{
     AllAccountsResponse, AllAllowancesResponse, AllowanceResponse, BalanceResponse, MinterResponse,
     TokenInfoResponse,
 };
-use wjuno::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
-use wjuno::state::State;
+use cw_wjuno::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use cw_wjuno::state::State;
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -20,7 +20,6 @@ fn main() {
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
-    export_schema(&schema_for!(InfoResponse), &out_dir);
     // cw20
     export_schema(&schema_for!(BalanceResponse), &out_dir);
     export_schema(&schema_for!(TokenInfoResponse), &out_dir);

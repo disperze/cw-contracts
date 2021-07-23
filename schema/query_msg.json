@@ -3,19 +3,6 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Return info contract (native coin)",
-      "type": "object",
-      "required": [
-        "info"
-      ],
-      "properties": {
-        "info": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
       "description": "CW20. Returns the current balance of the given address, 0 if unset.",
       "type": "object",
       "required": [
