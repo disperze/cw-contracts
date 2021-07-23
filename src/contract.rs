@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InfoResponse, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
 use cw2::set_contract_version;
@@ -176,8 +176,6 @@ pub fn try_withdraw(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Info {} => to_binary(&query_ctr_info(deps)?),
-
         // cw20 standard
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
@@ -194,14 +192,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&query_all_accounts(deps, start_after, limit)?)
         }
     }
-}
-
-pub fn query_ctr_info(deps: Deps) -> StdResult<InfoResponse> {
-    let info = STATE.load(deps.storage)?;
-    let res = InfoResponse {
-        native_coin: info.native_coin,
-    };
-    Ok(res)
 }
 
 #[cfg(test)]
@@ -226,11 +216,6 @@ mod tests {
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::Info {}).unwrap();
-        let value: InfoResponse = from_binary(&res).unwrap();
-        assert_eq!("juno", value.native_coin);
     }
 
     #[test]

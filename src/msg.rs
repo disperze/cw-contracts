@@ -73,9 +73,6 @@ pub enum ExecuteMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    /// Return info contract (native coin)
-    Info {},
-
     // Implements CW20
     /// CW20. Returns the current balance of the given address, 0 if unset.
     Balance { address: String },
@@ -100,9 +97,4 @@ pub enum QueryMsg {
         start_after: Option<String>,
         limit: Option<u32>,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InfoResponse {
-    pub native_coin: String,
 }
