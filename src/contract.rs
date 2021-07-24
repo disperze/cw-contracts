@@ -64,9 +64,7 @@ pub fn try_lock(
     let state = STATE.load(deps.storage)?;
     let diff = expire.minus_seconds(current_time.seconds());
     if diff.seconds().ge(&state.max_lock_time) {
-        return Err(ContractError::HighExpired {
-            diff_seconds: diff.seconds(),
-        });
+        return Err(ContractError::HighExpired {});
     }
 
     let key = info.sender.clone();
@@ -195,9 +193,7 @@ mod tests {
         };
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
         match res {
-            Err(ContractError::HighExpired { diff_seconds }) => {
-                assert_eq!(4000, diff_seconds);
-            }
+            Err(ContractError::HighExpired {}) => {}
             _ => panic!("Must return HighExpired error"),
         }
 

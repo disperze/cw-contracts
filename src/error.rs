@@ -15,8 +15,8 @@ pub enum ContractError {
     #[error("Expire time is lower")]
     LowExpired {},
 
-    #[error("Expire time is higher (diff in seconds: {diff_seconds:?})")]
-    HighExpired { diff_seconds: u64 },
+    #[error("Expire time is higher")]
+    HighExpired {},
 
     #[error("Lock already exists")]
     LockExists {},
