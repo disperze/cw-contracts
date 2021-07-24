@@ -6,6 +6,11 @@ use cosmwasm_std::{
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg};
 use crate::state::{State, LOCKS, STATE};
+use cw2::set_contract_version;
+
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw-lockbox";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -16,6 +21,8 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
     let state = State {
         max_lock_time: msg.max_lock_time,
         owner: info.sender,
