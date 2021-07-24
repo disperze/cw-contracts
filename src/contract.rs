@@ -68,17 +68,15 @@ pub fn try_lock(
     }
 
     let key = info.sender.clone();
-    let lock = LOCKS.may_load(deps.storage, &key)?;
-    if let Some(..) = lock {
-        return Err(ContractError::LockExists {});
-    }
-
     let lock_data = LockResponse {
         start: env.block.time,
         end: expire,
         amount: info.funds,
     };
-    LOCKS.save(deps.storage, &key, &lock_data)?;
+    LOCKS.update(deps.storage, &key, |existing| match existing {
+        None => Ok(lock_data),
+        Some(_) => Err(ContractError::LockExists {}),
+    })?;
 
     Ok(Response {
         attributes: vec![
