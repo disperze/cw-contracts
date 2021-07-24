@@ -130,7 +130,7 @@ fn query_lock(deps: Deps, address: String) -> StdResult<LockResponse> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, StdError, StdResult};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, StdResult};
 
     #[test]
     fn proper_initialization() {
@@ -153,19 +153,44 @@ mod tests {
         let msg = InstantiateMsg {
             max_lock_time: 3600,
         };
-        let info = mock_info("creator", &coins(2, "token"));
+        let info = mock_info("creator", &[]);
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // max time
+        // empty funds
+        let info = mock_info("anyone", &[]);
+        let msg = ExecuteMsg::Lock {
+            expire: Timestamp::from_seconds(10),
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::EmptyBalance {}) => {}
+            _ => panic!("Must return EmptyBalance error"),
+        }
+
+        // lower expire
+        let info = mock_info("anyone", &coins(2, "token"));
+        let msg = ExecuteMsg::Lock {
+            expire: Timestamp::from_seconds(10),
+        };
+        let mut env = mock_env();
+        env.block.time = Timestamp::from_seconds(100);
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        match res {
+            Err(ContractError::LowExpired {}) => {}
+            _ => panic!("Must return LowExpired error"),
+        }
+
+        // high expire
+        env.block.time = Timestamp::from_seconds(0);
         let info = mock_info("anyone", &coins(2, "token"));
         let msg = ExecuteMsg::Lock {
             expire: Timestamp::from_seconds(4000),
         };
-        let mut env = mock_env();
-        env.block.time = Timestamp::from_seconds(0);
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
         match res {
-            Err(ContractError::HighExpired { .. }) => {}
+            Err(ContractError::HighExpired { diff_seconds }) => {
+                assert_eq!(4000, diff_seconds);
+            }
             _ => panic!("Must return HighExpired error"),
         }
 
@@ -219,7 +244,15 @@ mod tests {
         let auth_info = mock_info("anyone", &[]);
         let msg = ExecuteMsg::Unlock {};
         env.block.time = Timestamp::from_seconds(401);
-        let _res = execute(deps.as_mut(), env, auth_info, msg).unwrap();
+        let res = execute(deps.as_mut(), env, auth_info, msg).unwrap();
+        assert_eq!(1, res.messages.len());
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                to_address: "anyone".into(),
+                amount: coins(2, "token")
+            })
+        );
 
         // should no exist lock
         let msg = QueryMsg::GetLock {
