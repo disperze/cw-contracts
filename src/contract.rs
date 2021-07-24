@@ -91,7 +91,7 @@ pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     }
 
     let bank_send = BankMsg::Send {
-        amount: lock.amount.clone(),
+        amount: lock.amount,
         to_address: info.sender.clone().into(),
     }
     .into();
