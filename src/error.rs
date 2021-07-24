@@ -8,6 +8,19 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+
+    #[error("Send some coins to lock funds")]
+    EmptyBalance {},
+
+    #[error("Expire time is lower")]
+    LowExpired {},
+
+    #[error("Expire time is higher (diff in seconds: {diff_seconds:?})")]
+    HighExpired { diff_seconds: u64 },
+
+    #[error("Lock already exists")]
+    LockExists {},
+
+    #[error("Lock has not expired")]
+    LockNotExpired {},
 }

@@ -46,24 +46,26 @@ pub fn try_lock(
     expire: Timestamp,
 ) -> Result<Response, ContractError> {
     if info.funds.is_empty() {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::EmptyBalance {});
     }
 
     let current_time = env.block.time;
     if current_time.ge(&expire) {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::LowExpired {});
     }
 
     let state = STATE.load(deps.storage)?;
     let diff = expire.minus_seconds(current_time.seconds());
     if diff.seconds().ge(&state.max_lock_time) {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::HighExpired {
+            diff_seconds: diff.seconds(),
+        });
     }
 
     let key = info.sender.clone();
     let lock = LOCKS.may_load(deps.storage, &key)?;
     if let Some(..) = lock {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::LockExists {});
     }
 
     let lock_data = LockResponse {
@@ -87,7 +89,7 @@ pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
     let key = info.sender.clone();
     let lock = LOCKS.load(deps.storage, &key)?;
     if env.block.time.le(&lock.end) {
-        return Err(ContractError::Unauthorized {});
+        return Err(ContractError::LockNotExpired {});
     }
 
     let bank_send = BankMsg::Send {
@@ -146,7 +148,7 @@ mod tests {
 
     #[test]
     fn lock() {
-        let mut deps = mock_dependencies(&coins(2, "token"));
+        let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
             max_lock_time: 3600,
@@ -163,8 +165,8 @@ mod tests {
         env.block.time = Timestamp::from_seconds(0);
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
         match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
+            Err(ContractError::HighExpired { .. }) => {}
+            _ => panic!("Must return HighExpired error"),
         }
 
         // lock funds
@@ -190,31 +192,31 @@ mod tests {
         let msg = InstantiateMsg {
             max_lock_time: 3600,
         };
-        let info = mock_info("creator", &coins(2, "token"));
+        let info = mock_info("creator", &[]);
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // lock funds
         let info = mock_info("anyone", &coins(2, "token"));
+        let mut env = mock_env();
+        env.block.time = Timestamp::from_seconds(0);
         let msg = ExecuteMsg::Lock {
             expire: Timestamp::from_seconds(400),
         };
-        let mut env = mock_env();
-        env.block.time = Timestamp::from_seconds(0);
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
-        // beneficiary can release it
+        // cannot unlock until expire
         let auth_info = mock_info("anyone", &[]);
         let msg = ExecuteMsg::Unlock {};
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(100);
         let res = execute(deps.as_mut(), env.clone(), auth_info, msg);
         match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
+            Err(ContractError::LockNotExpired {}) => {}
+            _ => panic!("Must return LockNotExpired error"),
         }
 
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &[]);
+        // unlock funds
+        let auth_info = mock_info("anyone", &[]);
         let msg = ExecuteMsg::Unlock {};
         env.block.time = Timestamp::from_seconds(401);
         let _res = execute(deps.as_mut(), env, auth_info, msg).unwrap();
@@ -226,7 +228,7 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), msg);
         match res {
             StdResult::Err(StdError::NotFound { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
+            _ => panic!("Must return Std:NotFound error"),
         }
     }
 }
