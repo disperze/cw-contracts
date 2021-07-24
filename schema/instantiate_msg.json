@@ -3,12 +3,14 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "count"
+    "max_lock_time"
   ],
   "properties": {
-    "count": {
+    "max_lock_time": {
+      "description": "Max lock time in seconds",
       "type": "integer",
-      "format": "int32"
+      "format": "uint64",
+      "minimum": 0.0
     }
   }
 }
