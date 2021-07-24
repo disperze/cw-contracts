@@ -1,3 +1,3 @@
 # Lockbox
 
-A juno smartcontract.
+A juno smartcontract for lock funds until expire.
