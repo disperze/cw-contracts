@@ -24,6 +24,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let state = State {
+        current: 0,
         max_lock_time: msg.max_lock_time,
         owner: info.sender,
     };
@@ -42,7 +43,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Lock { expire } => try_lock(deps, env, info, expire),
-        ExecuteMsg::Unlock {} => try_unlock(deps, env, info),
+        ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
     }
 }
 
@@ -61,72 +62,77 @@ pub fn try_lock(
         return Err(ContractError::LowExpired {});
     }
 
-    let state = STATE.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
     let diff = expire.minus_seconds(current_time.seconds());
     if diff.seconds().ge(&state.max_lock_time) {
         return Err(ContractError::HighExpired {});
     }
 
-    let key = info.sender.clone();
-    let lock = LOCKS.may_load(deps.storage, &key)?;
-    if let Some(..) = lock {
-        return Err(ContractError::LockExists {});
-    }
-
     let lock_data = LockResponse {
-        start: env.block.time,
-        end: expire,
-        amount: info.funds,
+        create: env.block.time,
+        expire,
+        funds: info.funds,
+        complete: false,
+        owner: info.sender.clone(),
     };
-    LOCKS.save(deps.storage, &key, &lock_data)?;
+
+    state.current += 1;
+    STATE.save(deps.storage, &state)?;
+    LOCKS.save(deps.storage, &state.current.to_string(), &lock_data)?;
 
     Ok(Response {
         attributes: vec![
             attr("action", "lock"),
             attr("from", info.sender),
-            // attr("amount", lock_data.amount.into()),
+            attr("id", state.current),
         ],
         ..Response::default()
     })
 }
 
-pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    let key = info.sender.clone();
-    let lock = LOCKS.load(deps.storage, &key)?;
-    if env.block.time.le(&lock.end) {
+pub fn try_unlock(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    id: u64,
+) -> Result<Response, ContractError> {
+    let key = id.to_string();
+    let mut lock = LOCKS.load(deps.storage, &key)?;
+    if lock.complete {
+        return Err(ContractError::LockComplete {});
+    }
+
+    if env.block.time.le(&lock.expire) {
         return Err(ContractError::LockNotExpired {});
     }
 
+    lock.complete = true;
+    LOCKS.save(deps.storage, &key, &lock)?;
+
     let bank_send = BankMsg::Send {
-        amount: lock.amount,
+        amount: lock.funds,
         to_address: info.sender.clone().into(),
     }
     .into();
 
     let res = Response {
         messages: vec![bank_send],
-        attributes: vec![
-            attr("action", "unlock"),
-            attr("from", info.sender),
-            // attr("amount", lock.amount),
-        ],
+        attributes: vec![attr("action", "unlock"), attr("from", info.sender)],
         ..Response::default()
     };
 
-    LOCKS.remove(deps.storage, &key);
     Ok(res)
 }
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetLock { address } => to_binary(&query_lock(deps, address)?),
+        QueryMsg::GetLock { id } => to_binary(&query_lock(deps, id)?),
     }
 }
 
-fn query_lock(deps: Deps, address: String) -> StdResult<LockResponse> {
-    let sender_addr = deps.api.addr_validate(&address)?;
-    let lock = LOCKS.load(deps.storage, &sender_addr)?;
+fn query_lock(deps: Deps, id: u64) -> StdResult<LockResponse> {
+    let lock = LOCKS.load(deps.storage, &id.to_string())?;
 
     Ok(lock)
 }
@@ -135,7 +141,7 @@ fn query_lock(deps: Deps, address: String) -> StdResult<LockResponse> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, StdResult};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg};
 
     #[test]
     fn proper_initialization() {
@@ -197,20 +203,32 @@ mod tests {
             _ => panic!("Must return HighExpired error"),
         }
 
-        // lock funds
+        // lock funds 1
         let msg = ExecuteMsg::Lock {
             expire: Timestamp::from_seconds(200),
+        };
+        let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // should exists lock
+        let msg = QueryMsg::GetLock { id: 1 };
+        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+        let value: LockResponse = from_binary(&res).unwrap();
+        assert_eq!(0, value.create.seconds());
+        assert_eq!(200, value.expire.seconds());
+        assert_eq!(false, value.complete);
+
+        // lock funds 2
+        let msg = ExecuteMsg::Lock {
+            expire: Timestamp::from_seconds(300),
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock {
-            address: "anyone".into(),
-        };
+        let msg = QueryMsg::GetLock { id: 2 };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
         let value: LockResponse = from_binary(&res).unwrap();
-        assert_eq!(0, value.start.seconds());
-        assert_eq!(200, value.end.seconds());
+        assert_eq!(300, value.expire.seconds());
+        assert_eq!(false, value.complete);
     }
 
     #[test]
@@ -234,7 +252,7 @@ mod tests {
 
         // cannot unlock until expire
         let auth_info = mock_info("anyone", &[]);
-        let msg = ExecuteMsg::Unlock {};
+        let msg = ExecuteMsg::Unlock { id: 1 };
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(100);
         let res = execute(deps.as_mut(), env.clone(), auth_info, msg);
@@ -245,7 +263,7 @@ mod tests {
 
         // unlock funds
         let auth_info = mock_info("anyone", &[]);
-        let msg = ExecuteMsg::Unlock {};
+        let msg = ExecuteMsg::Unlock { id: 1 };
         env.block.time = Timestamp::from_seconds(401);
         let res = execute(deps.as_mut(), env, auth_info, msg).unwrap();
         assert_eq!(1, res.messages.len());
@@ -257,14 +275,10 @@ mod tests {
             })
         );
 
-        // should no exist lock
-        let msg = QueryMsg::GetLock {
-            address: "anyone".into(),
-        };
-        let res = query(deps.as_ref(), mock_env(), msg);
-        match res {
-            StdResult::Err(StdError::NotFound { .. }) => {}
-            _ => panic!("Must return Std:NotFound error"),
-        }
+        // should lock completed
+        let data = query(deps.as_ref(), mock_env(), QueryMsg::GetLock { id: 1 }).unwrap();
+
+        let res: LockResponse = from_binary(&data).unwrap();
+        assert_eq!(true, res.complete)
     }
 }

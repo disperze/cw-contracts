@@ -12,11 +12,13 @@
         "get_lock": {
           "type": "object",
           "required": [
-            "address"
+            "id"
           ],
           "properties": {
-            "address": {
-              "type": "string"
+            "id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         }

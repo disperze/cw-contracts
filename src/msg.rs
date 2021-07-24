@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, Timestamp};
+use cosmwasm_std::{Addr, Coin, Timestamp};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,21 +14,22 @@ pub enum ExecuteMsg {
     /// Lock funds until expire timestamp
     Lock { expire: Timestamp },
     /// Unlock funds
-    Unlock {},
+    Unlock { id: u64 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns the lock info
-    GetLock { address: String },
+    GetLock { id: u64 },
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockResponse {
-    pub start: Timestamp,
-    pub end: Timestamp,
-    /// Amount locked in native tokens
-    pub amount: Vec<Coin>,
+    pub owner: Addr,
+    pub create: Timestamp,
+    pub expire: Timestamp,
+    pub funds: Vec<Coin>,
+    pub complete: bool,
 }
