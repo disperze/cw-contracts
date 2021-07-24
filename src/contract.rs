@@ -73,7 +73,7 @@ pub fn try_lock(
         expire,
         funds: info.funds,
         complete: false,
-        owner: info.sender.clone()
+        owner: info.sender.clone(),
     };
 
     state.current += 1;
@@ -90,7 +90,12 @@ pub fn try_lock(
     })
 }
 
-pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo, id: u64) -> Result<Response, ContractError> {
+pub fn try_unlock(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    id: u64,
+) -> Result<Response, ContractError> {
     let key = id.to_string();
     let mut lock = LOCKS.load(deps.storage, &key)?;
     if lock.complete {
@@ -112,10 +117,7 @@ pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo, id: u64) -> Result
 
     let res = Response {
         messages: vec![bank_send],
-        attributes: vec![
-            attr("action", "unlock"),
-            attr("from", info.sender),
-        ],
+        attributes: vec![attr("action", "unlock"), attr("from", info.sender)],
         ..Response::default()
     };
 
@@ -139,7 +141,7 @@ fn query_lock(deps: Deps, id: u64) -> StdResult<LockResponse> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, StdResult};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg};
 
     #[test]
     fn proper_initialization() {
@@ -201,20 +203,32 @@ mod tests {
             _ => panic!("Must return HighExpired error"),
         }
 
-        // lock funds
+        // lock funds 1
         let msg = ExecuteMsg::Lock {
             expire: Timestamp::from_seconds(200),
+        };
+        let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // should exists lock
+        let msg = QueryMsg::GetLock { id: 1 };
+        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+        let value: LockResponse = from_binary(&res).unwrap();
+        assert_eq!(0, value.create.seconds());
+        assert_eq!(200, value.expire.seconds());
+        assert_eq!(false, value.complete);
+
+        // lock funds 2
+        let msg = ExecuteMsg::Lock {
+            expire: Timestamp::from_seconds(300),
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock {
-            address: "anyone".into(),
-        };
+        let msg = QueryMsg::GetLock { id: 2 };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
         let value: LockResponse = from_binary(&res).unwrap();
-        assert_eq!(0, value.start.seconds());
-        assert_eq!(200, value.end.seconds());
+        assert_eq!(300, value.expire.seconds());
+        assert_eq!(false, value.complete);
     }
 
     #[test]
@@ -238,7 +252,7 @@ mod tests {
 
         // cannot unlock until expire
         let auth_info = mock_info("anyone", &[]);
-        let msg = ExecuteMsg::Unlock {};
+        let msg = ExecuteMsg::Unlock { id: 1 };
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(100);
         let res = execute(deps.as_mut(), env.clone(), auth_info, msg);
@@ -249,7 +263,7 @@ mod tests {
 
         // unlock funds
         let auth_info = mock_info("anyone", &[]);
-        let msg = ExecuteMsg::Unlock {};
+        let msg = ExecuteMsg::Unlock { id: 1 };
         env.block.time = Timestamp::from_seconds(401);
         let res = execute(deps.as_mut(), env, auth_info, msg).unwrap();
         assert_eq!(1, res.messages.len());
@@ -261,14 +275,10 @@ mod tests {
             })
         );
 
-        // should no exist lock
-        let msg = QueryMsg::GetLock {
-            address: "anyone".into(),
-        };
-        let res = query(deps.as_ref(), mock_env(), msg);
-        match res {
-            StdResult::Err(StdError::NotFound { .. }) => {}
-            _ => panic!("Must return Std:NotFound error"),
-        }
+        // should lock completed
+        let data = query(deps.as_ref(), mock_env(), QueryMsg::GetLock { id: 1 }).unwrap();
+
+        let res: LockResponse = from_binary(&data).unwrap();
+        assert_eq!(true, res.complete)
     }
 }

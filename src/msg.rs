@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, Timestamp, Addr};
+use cosmwasm_std::{Addr, Coin, Timestamp};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ pub enum ExecuteMsg {
     /// Lock funds until expire timestamp
     Lock { expire: Timestamp },
     /// Unlock funds
-    Unlock { id: u64},
+    Unlock { id: u64 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
