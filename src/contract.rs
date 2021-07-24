@@ -1,8 +1,11 @@
-use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Timestamp, BankMsg, attr};
+use cosmwasm_std::{
+    attr, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, Timestamp,
+};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, LockResponse};
-use crate::state::{State, STATE, LOCKS};
+use crate::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg};
+use crate::state::{State, LOCKS, STATE};
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
@@ -32,12 +35,16 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Lock { expire } => try_lock(deps, env, info, expire),
-        ExecuteMsg::Unlock { } => try_unlock(deps, env, info),
+        ExecuteMsg::Unlock {} => try_unlock(deps, env, info),
     }
 }
 
-pub fn try_lock(deps: DepsMut, env: Env, info: MessageInfo, expire: Timestamp ) -> Result<Response, ContractError> {
-
+pub fn try_lock(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    expire: Timestamp,
+) -> Result<Response, ContractError> {
     if info.funds.is_empty() {
         return Err(ContractError::Unauthorized {});
     }
@@ -85,7 +92,7 @@ pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
 
     let bank_send = BankMsg::Send {
         amount: lock.amount.clone(),
-        to_address: info.sender.clone().into()
+        to_address: info.sender.clone().into(),
     }
     .into();
 
@@ -127,7 +134,9 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg { max_lock_time: 3600 };
+        let msg = InstantiateMsg {
+            max_lock_time: 3600,
+        };
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -139,13 +148,17 @@ mod tests {
     fn lock() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let msg = InstantiateMsg { max_lock_time: 3600 };
+        let msg = InstantiateMsg {
+            max_lock_time: 3600,
+        };
         let info = mock_info("creator", &coins(2, "token"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // max time
         let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Lock { expire: Timestamp::from_seconds(4000)};
+        let msg = ExecuteMsg::Lock {
+            expire: Timestamp::from_seconds(4000),
+        };
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(0);
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
@@ -155,11 +168,15 @@ mod tests {
         }
 
         // lock funds
-        let msg = ExecuteMsg::Lock { expire: Timestamp::from_seconds(200)};
+        let msg = ExecuteMsg::Lock {
+            expire: Timestamp::from_seconds(200),
+        };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock { address: "anyone".into() };
+        let msg = QueryMsg::GetLock {
+            address: "anyone".into(),
+        };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
         let value: LockResponse = from_binary(&res).unwrap();
         assert_eq!(0, value.start.seconds());
@@ -170,20 +187,24 @@ mod tests {
     fn unlock() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let msg = InstantiateMsg { max_lock_time: 3600 };
+        let msg = InstantiateMsg {
+            max_lock_time: 3600,
+        };
         let info = mock_info("creator", &coins(2, "token"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // lock funds
         let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Lock { expire: Timestamp::from_seconds(400)};
+        let msg = ExecuteMsg::Lock {
+            expire: Timestamp::from_seconds(400),
+        };
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(0);
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // beneficiary can release it
         let auth_info = mock_info("anyone", &[]);
-        let msg = ExecuteMsg::Unlock { };
+        let msg = ExecuteMsg::Unlock {};
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(100);
         let res = execute(deps.as_mut(), env.clone(), auth_info, msg);
@@ -194,15 +215,17 @@ mod tests {
 
         // only the original creator can reset the counter
         let auth_info = mock_info("creator", &[]);
-        let msg = ExecuteMsg::Unlock { };
+        let msg = ExecuteMsg::Unlock {};
         env.block.time = Timestamp::from_seconds(401);
         let _res = execute(deps.as_mut(), env, auth_info, msg).unwrap();
 
         // should no exist lock
-        let msg = QueryMsg::GetLock { address: "anyone".into() };
+        let msg = QueryMsg::GetLock {
+            address: "anyone".into(),
+        };
         let res = query(deps.as_ref(), mock_env(), msg);
         match res {
-            StdResult::Err(StdError::NotFound {..}) => {}
+            StdResult::Err(StdError::NotFound { .. }) => {}
             _ => panic!("Must return unauthorized error"),
         }
     }

@@ -1,6 +1,6 @@
+use cosmwasm_std::{Coin, Timestamp};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cosmwasm_std::{Timestamp, Coin};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
@@ -12,9 +12,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Lock funds until expire timestamp
-    Lock {
-        expire: Timestamp
-    },
+    Lock { expire: Timestamp },
     /// Unlock funds
     Unlock {},
 }
