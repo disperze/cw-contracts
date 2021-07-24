@@ -24,6 +24,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let state = State {
+        current: 0,
         max_lock_time: msg.max_lock_time,
         owner: info.sender,
     };
@@ -42,7 +43,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Lock { expire } => try_lock(deps, env, info, expire),
-        ExecuteMsg::Unlock {} => try_unlock(deps, env, info),
+        ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
     }
 }
 
@@ -61,42 +62,50 @@ pub fn try_lock(
         return Err(ContractError::LowExpired {});
     }
 
-    let state = STATE.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
     let diff = expire.minus_seconds(current_time.seconds());
     if diff.seconds().ge(&state.max_lock_time) {
         return Err(ContractError::HighExpired {});
     }
 
-    let key = info.sender.clone();
     let lock_data = LockResponse {
-        start: env.block.time,
-        end: expire,
-        amount: info.funds,
+        create: env.block.time,
+        expire,
+        funds: info.funds,
+        complete: false,
+        owner: info.sender.clone()
     };
-    LOCKS.update(deps.storage, &key, |existing| match existing {
-        None => Ok(lock_data),
-        Some(_) => Err(ContractError::LockExists {}),
-    })?;
+
+    state.current += 1;
+    STATE.save(deps.storage, &state)?;
+    LOCKS.save(deps.storage, &state.current.to_string(), &lock_data)?;
 
     Ok(Response {
         attributes: vec![
             attr("action", "lock"),
             attr("from", info.sender),
-            // attr("amount", lock_data.amount.into()),
+            attr("id", state.current),
         ],
         ..Response::default()
     })
 }
 
-pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
-    let key = info.sender.clone();
-    let lock = LOCKS.load(deps.storage, &key)?;
-    if env.block.time.le(&lock.end) {
+pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo, id: u64) -> Result<Response, ContractError> {
+    let key = id.to_string();
+    let mut lock = LOCKS.load(deps.storage, &key)?;
+    if lock.complete {
+        return Err(ContractError::LockComplete {});
+    }
+
+    if env.block.time.le(&lock.expire) {
         return Err(ContractError::LockNotExpired {});
     }
 
+    lock.complete = true;
+    LOCKS.save(deps.storage, &key, &lock)?;
+
     let bank_send = BankMsg::Send {
-        amount: lock.amount,
+        amount: lock.funds,
         to_address: info.sender.clone().into(),
     }
     .into();
@@ -106,25 +115,22 @@ pub fn try_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response
         attributes: vec![
             attr("action", "unlock"),
             attr("from", info.sender),
-            // attr("amount", lock.amount),
         ],
         ..Response::default()
     };
 
-    LOCKS.remove(deps.storage, &key);
     Ok(res)
 }
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetLock { address } => to_binary(&query_lock(deps, address)?),
+        QueryMsg::GetLock { id } => to_binary(&query_lock(deps, id)?),
     }
 }
 
-fn query_lock(deps: Deps, address: String) -> StdResult<LockResponse> {
-    let sender_addr = deps.api.addr_validate(&address)?;
-    let lock = LOCKS.load(deps.storage, &sender_addr)?;
+fn query_lock(deps: Deps, id: u64) -> StdResult<LockResponse> {
+    let lock = LOCKS.load(deps.storage, &id.to_string())?;
 
     Ok(lock)
 }
