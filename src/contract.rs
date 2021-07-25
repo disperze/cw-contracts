@@ -82,8 +82,9 @@ pub fn try_lock(
     };
 
     state.current += 1;
+    let key = (sender, &state.current.to_string());
     STATE.save(deps.storage, &state)?;
-    LOCKS.save(deps.storage, &state.current.to_string(), &lock_data)?;
+    LOCKS.save(deps.storage, key, &lock_data)?;
 
     Ok(Response {
         attributes: vec![
@@ -101,8 +102,8 @@ pub fn try_unlock(
     info: MessageInfo,
     id: u64,
 ) -> Result<Response, ContractError> {
-    let key = id.to_string();
-    let mut lock = LOCKS.load(deps.storage, &key)?;
+    let key = (&info.sender, &id.to_string());
+    let mut lock = LOCKS.load(deps.storage, key)?;
     if lock.complete {
         return Err(ContractError::LockComplete {});
     }
@@ -112,7 +113,7 @@ pub fn try_unlock(
     }
 
     lock.complete = true;
-    LOCKS.save(deps.storage, &key, &lock)?;
+    LOCKS.save(deps.storage, key, &lock)?;
 
     // unlock all tokens
     let messages = send_tokens(&info.sender, &lock.funds)?;
@@ -184,13 +185,14 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetLock { id } => to_binary(&query_lock(deps, id)?),
-        QueryMsg::GetLocks { address } => {},
+        QueryMsg::GetLock { address, id } => to_binary(&query_lock(deps, address, id)?),
+        QueryMsg::GetLocks { address } => {}
     }
 }
 
-fn query_lock(deps: Deps, id: u64) -> StdResult<LockInfo> {
-    let lock = LOCKS.load(deps.storage, &id.to_string())?;
+fn query_lock(deps: Deps, address: String, id: u64) -> StdResult<LockInfo> {
+    let key = (&deps.api.addr_validate(&address)?, &id.to_string());
+    let lock = LOCKS.load(deps.storage, key)?;
     // transform tokens
     let native_balance = lock.funds.native;
     // lock.funds.
@@ -290,7 +292,10 @@ mod tests {
         let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock { id: 1 };
+        let msg = QueryMsg::GetLock {
+            address: "anyone".into(),
+            id: 1,
+        };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
         let value: LockInfo = from_binary(&res).unwrap();
         assert_eq!(0, value.create.seconds());
@@ -304,7 +309,10 @@ mod tests {
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock { id: 2 };
+        let msg = QueryMsg::GetLock {
+            address: "anyone".into(),
+            id: 2,
+        };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
         let value: LockInfo = from_binary(&res).unwrap();
         assert_eq!(300, value.expire.seconds());
@@ -356,7 +364,11 @@ mod tests {
         );
 
         // should lock completed
-        let data = query(deps.as_ref(), mock_env(), QueryMsg::GetLock { id: 1 }).unwrap();
+        let msg = QueryMsg::GetLock {
+            address: "anyone".into(),
+            id: 1,
+        };
+        let data = query(deps.as_ref(), mock_env(), msg).unwrap();
 
         let res: LockInfo = from_binary(&data).unwrap();
         assert_eq!(true, res.complete)

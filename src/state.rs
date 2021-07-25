@@ -43,4 +43,4 @@ pub struct Lock {
 }
 
 pub const STATE: Item<State> = Item::new("state");
-pub const LOCKS: Map<&str, Lock> = Map::new("locks");
+pub const LOCKS: Map<(&Addr, &String), Lock> = Map::new("locks");

@@ -30,7 +30,7 @@ pub enum ReceiveMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns the lock info
-    GetLock { id: u64 },
+    GetLock { address: String, id: u64 },
     /// Returns the locks by address
     GetLocks { address: String },
 }
