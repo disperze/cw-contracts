@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg, ReceiveMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, LockInfo, QueryMsg, ReceiveMsg};
 use crate::state::{GenericBalance, Lock, State, LOCKS, STATE};
 use cw2::set_contract_version;
 use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
@@ -185,14 +185,15 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetLock { id } => to_binary(&query_lock(deps, id)?),
+        QueryMsg::GetLocks { address } => {},
     }
 }
 
-fn query_lock(deps: Deps, id: u64) -> StdResult<LockResponse> {
+fn query_lock(deps: Deps, id: u64) -> StdResult<LockInfo> {
     let lock = LOCKS.load(deps.storage, &id.to_string())?;
     // transform tokens
     let native_balance = lock.funds.native;
-
+    // lock.funds.
     let cw20_balance: StdResult<Vec<_>> = lock
         .funds
         .cw20
@@ -205,7 +206,7 @@ fn query_lock(deps: Deps, id: u64) -> StdResult<LockResponse> {
         })
         .collect();
 
-    let details = LockResponse {
+    let details = LockInfo {
         owner: lock.owner,
         create: lock.create,
         expire: lock.expire,
@@ -291,7 +292,7 @@ mod tests {
         // should exists lock
         let msg = QueryMsg::GetLock { id: 1 };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
-        let value: LockResponse = from_binary(&res).unwrap();
+        let value: LockInfo = from_binary(&res).unwrap();
         assert_eq!(0, value.create.seconds());
         assert_eq!(200, value.expire.seconds());
         assert_eq!(false, value.complete);
@@ -305,7 +306,7 @@ mod tests {
         // should exists lock
         let msg = QueryMsg::GetLock { id: 2 };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
-        let value: LockResponse = from_binary(&res).unwrap();
+        let value: LockInfo = from_binary(&res).unwrap();
         assert_eq!(300, value.expire.seconds());
         assert_eq!(false, value.complete);
     }
@@ -357,7 +358,7 @@ mod tests {
         // should lock completed
         let data = query(deps.as_ref(), mock_env(), QueryMsg::GetLock { id: 1 }).unwrap();
 
-        let res: LockResponse = from_binary(&data).unwrap();
+        let res: LockInfo = from_binary(&data).unwrap();
         assert_eq!(true, res.complete)
     }
 }
