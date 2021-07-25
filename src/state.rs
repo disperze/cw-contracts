@@ -1,9 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Timestamp, Coin};
+use cosmwasm_std::{Addr, Coin, Timestamp};
+use cw20::{Balance, Cw20CoinVerified};
 use cw_storage_plus::{Item, Map};
-use cw20::Cw20CoinVerified;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
@@ -16,6 +16,21 @@ pub struct State {
 pub struct GenericBalance {
     pub native: Vec<Coin>,
     pub cw20: Vec<Cw20CoinVerified>,
+}
+
+impl From<Balance> for GenericBalance {
+    fn from(balance: Balance) -> GenericBalance {
+        match balance {
+            Balance::Native(balance) => GenericBalance {
+                native: balance.0,
+                cw20: vec![],
+            },
+            Balance::Cw20(token) => GenericBalance {
+                native: vec![],
+                cw20: vec![token],
+            },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

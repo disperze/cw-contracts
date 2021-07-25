@@ -1,10 +1,13 @@
-use cosmwasm_std::{attr, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Timestamp, from_binary, Addr, WasmMsg, CosmosMsg};
+use cosmwasm_std::{
+    attr, entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
+    Env, MessageInfo, Response, StdResult, Timestamp, WasmMsg,
+};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg, ReceiveMsg};
-use crate::state::{State, LOCKS, STATE, Lock, GenericBalance};
+use crate::state::{GenericBalance, Lock, State, LOCKS, STATE};
 use cw2::set_contract_version;
-use cw20::{Cw20ReceiveMsg, Balance, Cw20CoinVerified, Cw20ExecuteMsg, Cw20Coin};
+use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-lockbox";
@@ -40,7 +43,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Lock { expire } => try_lock(deps, env, Balance::from(info.funds), &info.sender, expire),
+        ExecuteMsg::Lock { expire } => {
+            try_lock(deps, env, Balance::from(info.funds), &info.sender, expire)
+        }
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
         ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
     }
@@ -68,23 +73,10 @@ pub fn try_lock(
         return Err(ContractError::HighExpired {});
     }
 
-    let lock_funds = match balance {
-        Balance::Native(balance) => GenericBalance {
-            native: balance.0,
-            cw20: vec![],
-        },
-        Balance::Cw20(token) => {
-            GenericBalance {
-                native: vec![],
-                cw20: vec![token],
-            }
-        }
-    };
-
     let lock_data = Lock {
         create: env.block.time,
         expire,
-        funds: lock_funds,
+        funds: balance.into(),
         complete: false,
         owner: sender.to_owned(),
     };
@@ -147,9 +139,13 @@ pub fn try_recive(
     });
     let api = deps.api;
     match msg {
-        ReceiveMsg::Lock {expire} => {
-            try_lock(deps, env, balance, &api.addr_validate(&wrapper.sender)?, expire)
-        }
+        ReceiveMsg::Lock { expire } => try_lock(
+            deps,
+            env,
+            balance,
+            &api.addr_validate(&wrapper.sender)?,
+            expire,
+        ),
     }
 }
 
@@ -162,7 +158,7 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
             to_address: to.into(),
             amount: native_balance.to_vec(),
         }
-            .into()]
+        .into()]
     };
 
     let cw20_balance = &balance.cw20;

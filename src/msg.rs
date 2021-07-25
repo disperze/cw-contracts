@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Coin, Timestamp};
+use cw20::{Cw20Coin, Cw20ReceiveMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cw20::{Cw20ReceiveMsg, Cw20Coin};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
