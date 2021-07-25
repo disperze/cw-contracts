@@ -189,8 +189,8 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetLock { address, id } => to_binary(&query_lock(deps, address, id)?),
-        QueryMsg::GetLocks { address } => to_binary(&query_locks(deps, address)?),
+        QueryMsg::Lock { address, id } => to_binary(&query_lock(deps, address, id)?),
+        QueryMsg::AllLocks { address } => to_binary(&query_locks(deps, address)?),
     }
 }
 
@@ -323,7 +323,7 @@ mod tests {
         let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock {
+        let msg = QueryMsg::Lock {
             address: "anyone".into(),
             id: "1".into(),
         };
@@ -352,7 +352,7 @@ mod tests {
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock {
+        let msg = QueryMsg::Lock {
             address: "anyone".into(),
             id: "2".into(),
         };
@@ -364,7 +364,7 @@ mod tests {
         let res = query(
             deps.as_ref(),
             mock_env(),
-            QueryMsg::GetLocks {
+            QueryMsg::AllLocks {
                 address: "anyone".into(),
             },
         )
@@ -419,7 +419,7 @@ mod tests {
         );
 
         // should lock completed
-        let msg = QueryMsg::GetLock {
+        let msg = QueryMsg::Lock {
             address: "anyone".into(),
             id: "1".into(),
         };

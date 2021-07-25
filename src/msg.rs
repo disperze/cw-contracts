@@ -30,9 +30,9 @@ pub enum ReceiveMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns the lock info
-    GetLock { address: String, id: String },
+    Lock { address: String, id: String },
     /// Returns the locks by address
-    GetLocks { address: String },
+    AllLocks { address: String },
 }
 
 // We define a custom struct for each query response

@@ -6,10 +6,10 @@
       "description": "Returns the lock info",
       "type": "object",
       "required": [
-        "get_lock"
+        "lock"
       ],
       "properties": {
-        "get_lock": {
+        "lock": {
           "type": "object",
           "required": [
             "address",
@@ -31,10 +31,10 @@
       "description": "Returns the locks by address",
       "type": "object",
       "required": [
-        "get_locks"
+        "all_locks"
       ],
       "properties": {
-        "get_locks": {
+        "all_locks": {
           "type": "object",
           "required": [
             "address"
