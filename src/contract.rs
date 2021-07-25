@@ -3,9 +3,11 @@ use cosmwasm_std::{
     Env, MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
 };
 
+use crate::balance::GenericBalance;
 use crate::error::ContractError;
 use crate::msg::{AllLocksResponse, ExecuteMsg, InstantiateMsg, LockInfo, QueryMsg, ReceiveMsg};
-use crate::state::{GenericBalance, Lock, State, LOCKS, STATE};
+use crate::state::{Lock, State, LOCKS, STATE};
+
 use cw2::set_contract_version;
 use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
@@ -115,8 +117,6 @@ pub fn try_increase_lock(
     let mut lock = LOCKS.load(deps.storage, key.clone())?;
 
     lock.funds.add_tokens(balance);
-
-    // and save
     LOCKS.save(deps.storage, key, &lock)?;
 
     Ok(Response {
