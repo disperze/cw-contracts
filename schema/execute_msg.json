@@ -28,6 +28,27 @@
       "additionalProperties": false
     },
     {
+      "description": "Increase previous lock",
+      "type": "object",
+      "required": [
+        "increase_lock"
+      ],
+      "properties": {
+        "increase_lock": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Unlock funds",
       "type": "object",
       "required": [
