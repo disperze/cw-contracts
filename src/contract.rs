@@ -53,7 +53,7 @@ pub fn execute(
             expire,
         ),
         ExecuteMsg::IncreaseLock { id } => {
-            try_increase_lock(deps, Balance::from(info.funds), &info.sender, id)
+            try_increase_lock(deps, env, Balance::from(info.funds), &info.sender, id)
         }
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
         ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
@@ -105,6 +105,7 @@ pub fn try_lock(
 
 pub fn try_increase_lock(
     deps: DepsMut,
+    env: Env,
     balance: Balance,
     sender: &Addr,
     id: String,
@@ -115,6 +116,10 @@ pub fn try_increase_lock(
 
     let key = (sender, id.to_owned());
     let mut lock = LOCKS.load(deps.storage, key.clone())?;
+
+    if env.block.time.gt(&lock.expire) {
+        return Err(ContractError::LockExpired {});
+    }
 
     lock.funds.add_tokens(balance);
     LOCKS.save(deps.storage, key, &lock)?;
@@ -176,7 +181,7 @@ pub fn try_recive(
     let sender = &api.addr_validate(&wrapper.sender)?;
     match msg {
         ReceiveMsg::Lock { id, expire } => try_lock(deps, env, balance, sender, id, expire),
-        ReceiveMsg::IncreaseLock { id } => try_increase_lock(deps, balance, sender, id),
+        ReceiveMsg::IncreaseLock { id } => try_increase_lock(deps, env, balance, sender, id),
     }
 }
 
