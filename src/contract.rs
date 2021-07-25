@@ -50,6 +50,9 @@ pub fn execute(
             id,
             expire,
         ),
+        ExecuteMsg::IncreaseLock { id } => {
+            try_increase_lock(deps, Balance::from(info.funds), &info.sender, id)
+        }
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
         ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
     }
@@ -99,6 +102,34 @@ pub fn try_lock(
     })
 }
 
+pub fn try_increase_lock(
+    deps: DepsMut,
+    balance: Balance,
+    sender: &Addr,
+    id: String,
+) -> Result<Response, ContractError> {
+    if balance.is_empty() {
+        return Err(ContractError::EmptyBalance {});
+    }
+
+    let key = (sender, id.to_owned());
+    let mut lock = LOCKS.load(deps.storage, key.clone())?;
+
+    lock.funds.add_tokens(balance);
+
+    // and save
+    LOCKS.save(deps.storage, key, &lock)?;
+
+    Ok(Response {
+        attributes: vec![
+            attr("action", "increase_lock"),
+            attr("from", sender),
+            attr("id", id),
+        ],
+        ..Response::default()
+    })
+}
+
 pub fn try_unlock(
     deps: DepsMut,
     env: Env,
@@ -107,6 +138,7 @@ pub fn try_unlock(
 ) -> Result<Response, ContractError> {
     let key = (&info.sender, id);
     let mut lock = LOCKS.load(deps.storage, key.clone())?;
+
     if lock.complete {
         return Err(ContractError::LockComplete {});
     }
@@ -142,15 +174,10 @@ pub fn try_recive(
         amount: wrapper.amount,
     });
     let api = deps.api;
+    let sender = &api.addr_validate(&wrapper.sender)?;
     match msg {
-        ReceiveMsg::Lock { id, expire } => try_lock(
-            deps,
-            env,
-            balance,
-            &api.addr_validate(&wrapper.sender)?,
-            id,
-            expire,
-        ),
+        ReceiveMsg::Lock { id, expire } => try_lock(deps, env, balance, sender, id, expire),
+        ReceiveMsg::IncreaseLock { id } => try_increase_lock(deps, balance, sender, id),
     }
 }
 
