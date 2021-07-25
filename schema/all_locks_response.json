@@ -1,32 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "LockResponse",
+  "title": "AllLocksResponse",
   "type": "object",
   "required": [
-    "complete",
-    "create",
-    "expire",
-    "funds",
-    "owner"
+    "locks"
   ],
   "properties": {
-    "complete": {
-      "type": "boolean"
-    },
-    "create": {
-      "$ref": "#/definitions/Timestamp"
-    },
-    "expire": {
-      "$ref": "#/definitions/Timestamp"
-    },
-    "funds": {
+    "locks": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/Coin"
+        "$ref": "#/definitions/LockInfo"
       }
-    },
-    "owner": {
-      "$ref": "#/definitions/Addr"
     }
   },
   "definitions": {
@@ -46,6 +30,64 @@
         },
         "denom": {
           "type": "string"
+        }
+      }
+    },
+    "Cw20Coin": {
+      "type": "object",
+      "required": [
+        "address",
+        "amount"
+      ],
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        }
+      }
+    },
+    "LockInfo": {
+      "type": "object",
+      "required": [
+        "complete",
+        "create",
+        "cw20_balance",
+        "expire",
+        "id",
+        "native_balance",
+        "owner"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "create": {
+          "$ref": "#/definitions/Timestamp"
+        },
+        "cw20_balance": {
+          "description": "Funds in cw20 tokens",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Cw20Coin"
+          }
+        },
+        "expire": {
+          "$ref": "#/definitions/Timestamp"
+        },
+        "id": {
+          "type": "string"
+        },
+        "native_balance": {
+          "description": "Funds in native tokens",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Coin"
+          }
+        },
+        "owner": {
+          "$ref": "#/definitions/Addr"
         }
       }
     },

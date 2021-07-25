@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cw_lockbox::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg};
+use cw_lockbox::msg::{AllLocksResponse, ExecuteMsg, InstantiateMsg, LockInfo, QueryMsg};
 use cw_lockbox::state::State;
 
 fn main() {
@@ -16,5 +16,6 @@ fn main() {
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
-    export_schema(&schema_for!(LockResponse), &out_dir);
+    export_schema(&schema_for!(LockInfo), &out_dir);
+    export_schema(&schema_for!(AllLocksResponse), &out_dir);
 }

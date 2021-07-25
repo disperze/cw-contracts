@@ -3,16 +3,10 @@
   "title": "State",
   "type": "object",
   "required": [
-    "current",
     "max_lock_time",
     "owner"
   ],
   "properties": {
-    "current": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
     "max_lock_time": {
       "type": "integer",
       "format": "uint64",
