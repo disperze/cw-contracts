@@ -152,10 +152,10 @@ pub fn try_unlock(
     }
 
     lock.complete = true;
-    LOCKS.save(deps.storage, key, &lock)?;
 
     // unlock all tokens
     let messages = send_tokens(&info.sender, &lock.funds)?;
+    LOCKS.remove(deps.storage, key);
 
     let res = Response {
         messages,
