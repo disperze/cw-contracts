@@ -275,7 +275,7 @@ fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError};
 
     #[test]
     fn proper_initialization() {
@@ -396,6 +396,50 @@ mod tests {
         .unwrap();
         let value: AllLocksResponse = from_binary(&res).unwrap();
         assert_eq!(2, value.locks.len())
+    }
+
+    #[test]
+    fn increase_lock() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            max_lock_time: 3600,
+        };
+        let info = mock_info("creator", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // lock funds
+        let mut env = mock_env();
+        let info = mock_info("anyone", &coins(2, "token"));
+        env.block.time = Timestamp::from_seconds(100);
+        let msg = ExecuteMsg::Lock {
+            id: "1".into(),
+            expire: Timestamp::from_seconds(200),
+        };
+        let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // try increase lock invalid id
+        let info = mock_info("anyone", &coins(5, "token"));
+        let msg = ExecuteMsg::IncreaseLock { id: "2".into() };
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        match res {
+            Err(ContractError::Std(StdError::NotFound { .. })) => {}
+            _ => panic!("Must return StdError::NotFound error"),
+        }
+
+        // increase valid lock
+        let msg = ExecuteMsg::IncreaseLock { id: "1".into() };
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // query funds lock
+        let msg = QueryMsg::Lock {
+            address: "anyone".into(),
+            id: "1".into(),
+        };
+        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+        let value: LockInfo = from_binary(&res).unwrap();
+        assert_eq!(coins(7, "token"), value.native_balance);
     }
 
     #[test]
