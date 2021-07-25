@@ -38,6 +38,7 @@ pub enum QueryMsg {
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockInfo {
+    pub id: String,
     pub owner: Addr,
     pub create: Timestamp,
     pub expire: Timestamp,
