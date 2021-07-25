@@ -86,7 +86,6 @@ pub fn try_lock(
         expire,
         funds: balance.into(),
         complete: false,
-        owner: sender.to_owned(),
     };
     let key = (sender, id.to_owned());
 
@@ -262,7 +261,6 @@ fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
 
     let lock_info = LockInfo {
         id,
-        owner: lock.owner,
         create: lock.create,
         expire: lock.expire,
         complete: lock.complete,

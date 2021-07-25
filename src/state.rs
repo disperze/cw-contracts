@@ -69,7 +69,6 @@ impl From<Balance> for GenericBalance {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Lock {
-    pub owner: Addr,
     pub create: Timestamp,
     pub expire: Timestamp,
     pub funds: GenericBalance,
