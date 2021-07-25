@@ -31,6 +31,8 @@ pub enum ReceiveMsg {
 pub enum QueryMsg {
     /// Returns the lock info
     GetLock { id: u64 },
+    /// Returns the locks by address
+    GetLocks { address: String },
 }
 
 // We define a custom struct for each query response
