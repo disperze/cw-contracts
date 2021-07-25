@@ -16,7 +16,6 @@ pub struct Lock {
     pub create: Timestamp,
     pub expire: Timestamp,
     pub funds: GenericBalance,
-    pub complete: bool,
 }
 
 pub const STATE: Item<State> = Item::new("state");

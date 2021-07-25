@@ -48,7 +48,6 @@ pub struct LockInfo {
     pub native_balance: Vec<Coin>,
     /// Funds in cw20 tokens
     pub cw20_balance: Vec<Cw20Coin>,
-    pub complete: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
