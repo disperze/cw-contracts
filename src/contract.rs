@@ -360,6 +360,17 @@ mod tests {
         let value: LockInfo = from_binary(&res).unwrap();
         assert_eq!(300, value.expire.seconds());
         assert_eq!(false, value.complete);
+
+        let res = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::GetLocks {
+                address: "anyone".into(),
+            },
+        )
+        .unwrap();
+        let value: AllLocksResponse = from_binary(&res).unwrap();
+        assert_eq!(2, value.locks.len())
     }
 
     #[test]
