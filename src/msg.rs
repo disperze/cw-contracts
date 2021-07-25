@@ -48,3 +48,8 @@ pub struct LockInfo {
     pub cw20_balance: Vec<Cw20Coin>,
     pub complete: bool,
 }
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct AllLocksResponse {
+    pub locks: Vec<LockInfo>,
+}

@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, LockInfo, QueryMsg, ReceiveMsg};
+use crate::msg::{AllLocksResponse, ExecuteMsg, InstantiateMsg, LockInfo, QueryMsg, ReceiveMsg};
 use crate::state::{GenericBalance, Lock, State, LOCKS, STATE};
 use cw2::set_contract_version;
 use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
@@ -197,9 +197,30 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_lock(deps: Deps, address: String, id: String) -> StdResult<LockInfo> {
     let key = (&deps.api.addr_validate(&address)?, id.to_owned());
     let lock = LOCKS.load(deps.storage, key)?;
+
+    to_lock_info(lock, id)
+}
+
+fn query_locks(deps: Deps, address: String) -> StdResult<AllLocksResponse> {
+    let owner_addr = &deps.api.addr_validate(&address)?;
+
+    let locks_result: StdResult<Vec<LockInfo>> = LOCKS
+        .prefix(&owner_addr)
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|item| {
+            let (k, v) = item?;
+            to_lock_info(v, String::from_utf8(k)?)
+        })
+        .collect();
+
+    Ok(AllLocksResponse {
+        locks: locks_result?,
+    })
+}
+
+fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
     // transform tokens
     let native_balance = lock.funds.native;
-    // lock.funds.
     let cw20_balance: StdResult<Vec<_>> = lock
         .funds
         .cw20
@@ -212,7 +233,7 @@ fn query_lock(deps: Deps, address: String, id: String) -> StdResult<LockInfo> {
         })
         .collect();
 
-    let details = LockInfo {
+    let lock_info = LockInfo {
         id,
         owner: lock.owner,
         create: lock.create,
@@ -221,43 +242,8 @@ fn query_lock(deps: Deps, address: String, id: String) -> StdResult<LockInfo> {
         native_balance,
         cw20_balance: cw20_balance?,
     };
-    Ok(details)
-}
 
-fn query_locks(deps: Deps, address: String) -> StdResult<Vec<LockInfo>> {
-    let owner_addr = &deps.api.addr_validate(&address)?;
-
-    let locks: StdResult<Vec<LockInfo>> = LOCKS
-        .prefix(&owner_addr)
-        .range(deps.storage, None, None, Order::Ascending)
-        .map(|item| {
-            let (k, v) = item?;
-            let native_balance = v.funds.native;
-            // lock.funds.
-            let cw20_balance: StdResult<Vec<_>> = v
-                .funds
-                .cw20
-                .into_iter()
-                .map(|token| {
-                    Ok(Cw20Coin {
-                        address: token.address.into(),
-                        amount: token.amount,
-                    })
-                })
-                .collect();
-            Ok(LockInfo {
-                id: String::from_utf8(k)?,
-                owner: owner_addr.clone(),
-                create: v.create,
-                expire: v.expire,
-                complete: v.complete,
-                native_balance,
-                cw20_balance: cw20_balance?,
-            })
-        })
-        .collect();
-
-    locks
+    Ok(lock_info)
 }
 
 #[cfg(test)]
