@@ -18,11 +18,11 @@ pub enum ContractError {
     #[error("Expire time is higher")]
     HighExpired {},
 
-    #[error("Lock already completed")]
-    LockComplete {},
-
     #[error("Lock has not expired")]
     LockNotExpired {},
+
+    #[error("Lock has expired")]
+    LockExpired {},
 
     #[error("Lock id already in use")]
     AlreadyInUse {},
