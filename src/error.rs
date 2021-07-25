@@ -23,4 +23,7 @@ pub enum ContractError {
 
     #[error("Lock has not expired")]
     LockNotExpired {},
+
+    #[error("Lock id already in use")]
+    AlreadyInUse {},
 }

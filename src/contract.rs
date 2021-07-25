@@ -67,22 +67,26 @@ pub fn try_lock(
         return Err(ContractError::LowExpired {});
     }
 
-    let mut state = STATE.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     let diff = expire.minus_seconds(current_time.seconds());
     if diff.seconds().ge(&state.max_lock_time) {
         return Err(ContractError::HighExpired {});
     }
 
-    let lock_data = Lock {
+    let lock = Lock {
         create: env.block.time,
         expire,
         funds: balance.into(),
         complete: false,
         owner: sender.to_owned(),
     };
-
     let key = (sender, id.to_owned());
-    LOCKS.save(deps.storage, key, &lock_data)?;
+
+    // try to store it, fail if the id was already in use
+    LOCKS.update(deps.storage, key, |existing| match existing {
+        None => Ok(lock),
+        Some(_) => Err(ContractError::AlreadyInUse {}),
+    })?;
 
     Ok(Response {
         attributes: vec![
@@ -185,7 +189,7 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetLock { address, id } => to_binary(&query_lock(deps, address, id)?),
-        QueryMsg::GetLocks { address } => {}
+        QueryMsg::GetLocks { address } => { to_binary(&query_lock(deps, address, "1".into())?)}
     }
 }
 
@@ -304,6 +308,17 @@ mod tests {
         assert_eq!(0, value.create.seconds());
         assert_eq!(200, value.expire.seconds());
         assert_eq!(false, value.complete);
+
+        // try lock same id
+        let msg = ExecuteMsg::Lock {
+            id: "1".into(),
+            expire: Timestamp::from_seconds(200),
+        };
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        match res {
+            Err(ContractError::AlreadyInUse {}) => {}
+            _ => panic!("Must return AlreadyInUse error"),
+        }
 
         // lock funds 2
         let msg = ExecuteMsg::Lock {
