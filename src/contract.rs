@@ -419,8 +419,19 @@ mod tests {
             _ => panic!("Must return StdError::NotFound error"),
         }
 
+        // try increase lock after expire
+        let info = mock_info("anyone", &coins(5, "token"));
+        let msg = ExecuteMsg::IncreaseLock { id: "1".into() };
+        env.block.time = Timestamp::from_seconds(201);
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        match res {
+            Err(ContractError::LockExpired {}) => {}
+            _ => panic!("Must return LockExpired error"),
+        }
+
         // increase valid lock
         let msg = ExecuteMsg::IncreaseLock { id: "1".into() };
+        env.block.time = Timestamp::from_seconds(120);
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
