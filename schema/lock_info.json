@@ -3,7 +3,6 @@
   "title": "LockInfo",
   "type": "object",
   "required": [
-    "complete",
     "create",
     "cw20_balance",
     "expire",
@@ -11,9 +10,6 @@
     "native_balance"
   ],
   "properties": {
-    "complete": {
-      "type": "boolean"
-    },
     "create": {
       "$ref": "#/definitions/Timestamp"
     },
