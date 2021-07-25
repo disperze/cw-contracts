@@ -6,19 +6,42 @@
       "description": "Returns the lock info",
       "type": "object",
       "required": [
-        "get_lock"
+        "lock"
       ],
       "properties": {
-        "get_lock": {
+        "lock": {
           "type": "object",
           "required": [
+            "address",
             "id"
           ],
           "properties": {
+            "address": {
+              "type": "string"
+            },
             "id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Returns the locks by address",
+      "type": "object",
+      "required": [
+        "all_locks"
+      ],
+      "properties": {
+        "all_locks": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "type": "string"
             }
           }
         }

@@ -1,12 +1,13 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, Timestamp,
+    attr, entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
+    Env, MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
 };
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg};
-use crate::state::{State, LOCKS, STATE};
+use crate::msg::{AllLocksResponse, ExecuteMsg, InstantiateMsg, LockInfo, QueryMsg, ReceiveMsg};
+use crate::state::{GenericBalance, Lock, State, LOCKS, STATE};
 use cw2::set_contract_version;
+use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-lockbox";
@@ -24,7 +25,6 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let state = State {
-        current: 0,
         max_lock_time: msg.max_lock_time,
         owner: info.sender,
     };
@@ -42,18 +42,28 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Lock { expire } => try_lock(deps, env, info, expire),
+        ExecuteMsg::Lock { id, expire } => try_lock(
+            deps,
+            env,
+            Balance::from(info.funds),
+            &info.sender,
+            id,
+            expire,
+        ),
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
+        ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
     }
 }
 
 pub fn try_lock(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    balance: Balance,
+    sender: &Addr,
+    id: String,
     expire: Timestamp,
 ) -> Result<Response, ContractError> {
-    if info.funds.is_empty() {
+    if balance.is_empty() {
         return Err(ContractError::EmptyBalance {});
     }
 
@@ -62,30 +72,29 @@ pub fn try_lock(
         return Err(ContractError::LowExpired {});
     }
 
-    let mut state = STATE.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
     let diff = expire.minus_seconds(current_time.seconds());
     if diff.seconds().ge(&state.max_lock_time) {
         return Err(ContractError::HighExpired {});
     }
 
-    let lock_data = LockResponse {
+    let lock = Lock {
         create: env.block.time,
         expire,
-        funds: info.funds,
+        funds: balance.into(),
         complete: false,
-        owner: info.sender.clone(),
+        owner: sender.to_owned(),
     };
+    let key = (sender, id.to_owned());
 
-    state.current += 1;
-    STATE.save(deps.storage, &state)?;
-    LOCKS.save(deps.storage, &state.current.to_string(), &lock_data)?;
+    // try to store it, fail if the id was already in use
+    LOCKS.update(deps.storage, key, |existing| match existing {
+        None => Ok(lock),
+        Some(_) => Err(ContractError::AlreadyInUse {}),
+    })?;
 
     Ok(Response {
-        attributes: vec![
-            attr("action", "lock"),
-            attr("from", info.sender),
-            attr("id", state.current),
-        ],
+        attributes: vec![attr("action", "lock"), attr("from", sender), attr("id", id)],
         ..Response::default()
     })
 }
@@ -94,10 +103,10 @@ pub fn try_unlock(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    id: u64,
+    id: String,
 ) -> Result<Response, ContractError> {
-    let key = id.to_string();
-    let mut lock = LOCKS.load(deps.storage, &key)?;
+    let key = (&info.sender, id);
+    let mut lock = LOCKS.load(deps.storage, key.clone())?;
     if lock.complete {
         return Err(ContractError::LockComplete {});
     }
@@ -107,16 +116,13 @@ pub fn try_unlock(
     }
 
     lock.complete = true;
-    LOCKS.save(deps.storage, &key, &lock)?;
+    LOCKS.save(deps.storage, key, &lock)?;
 
-    let bank_send = BankMsg::Send {
-        amount: lock.funds,
-        to_address: info.sender.clone().into(),
-    }
-    .into();
+    // unlock all tokens
+    let messages = send_tokens(&info.sender, &lock.funds)?;
 
     let res = Response {
-        messages: vec![bank_send],
+        messages,
         attributes: vec![attr("action", "unlock"), attr("from", info.sender)],
         ..Response::default()
     };
@@ -124,17 +130,120 @@ pub fn try_unlock(
     Ok(res)
 }
 
-#[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn try_recive(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    wrapper: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    let msg: ReceiveMsg = from_binary(&wrapper.msg)?;
+    let balance = Balance::Cw20(Cw20CoinVerified {
+        address: info.sender,
+        amount: wrapper.amount,
+    });
+    let api = deps.api;
     match msg {
-        QueryMsg::GetLock { id } => to_binary(&query_lock(deps, id)?),
+        ReceiveMsg::Lock { id, expire } => try_lock(
+            deps,
+            env,
+            balance,
+            &api.addr_validate(&wrapper.sender)?,
+            id,
+            expire,
+        ),
     }
 }
 
-fn query_lock(deps: Deps, id: u64) -> StdResult<LockResponse> {
-    let lock = LOCKS.load(deps.storage, &id.to_string())?;
+fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>> {
+    let native_balance = &balance.native;
+    let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
+        vec![]
+    } else {
+        vec![BankMsg::Send {
+            to_address: to.into(),
+            amount: native_balance.to_vec(),
+        }
+        .into()]
+    };
 
-    Ok(lock)
+    let cw20_balance = &balance.cw20;
+    let cw20_msgs: StdResult<Vec<_>> = cw20_balance
+        .iter()
+        .map(|c| {
+            let msg = Cw20ExecuteMsg::Transfer {
+                recipient: to.into(),
+                amount: c.amount,
+            };
+            let exec = WasmMsg::Execute {
+                contract_addr: c.address.to_string(),
+                msg: to_binary(&msg)?,
+                send: vec![],
+            };
+            Ok(exec.into())
+        })
+        .collect();
+    msgs.append(&mut cw20_msgs?);
+    Ok(msgs)
+}
+
+#[entry_point]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::Lock { address, id } => to_binary(&query_lock(deps, address, id)?),
+        QueryMsg::AllLocks { address } => to_binary(&query_locks(deps, address)?),
+    }
+}
+
+fn query_lock(deps: Deps, address: String, id: String) -> StdResult<LockInfo> {
+    let key = (&deps.api.addr_validate(&address)?, id.to_owned());
+    let lock = LOCKS.load(deps.storage, key)?;
+
+    to_lock_info(lock, id)
+}
+
+fn query_locks(deps: Deps, address: String) -> StdResult<AllLocksResponse> {
+    let owner_addr = &deps.api.addr_validate(&address)?;
+
+    let locks_result: StdResult<Vec<LockInfo>> = LOCKS
+        .prefix(&owner_addr)
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|item| {
+            let (k, v) = item?;
+            to_lock_info(v, String::from_utf8(k)?)
+        })
+        .collect();
+
+    Ok(AllLocksResponse {
+        locks: locks_result?,
+    })
+}
+
+fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
+    // transform tokens
+    let native_balance = lock.funds.native;
+    let cw20_balance: StdResult<Vec<_>> = lock
+        .funds
+        .cw20
+        .into_iter()
+        .map(|token| {
+            Ok(Cw20Coin {
+                address: token.address.into(),
+                amount: token.amount,
+            })
+        })
+        .collect();
+
+    let lock_info = LockInfo {
+        id,
+        owner: lock.owner,
+        create: lock.create,
+        expire: lock.expire,
+        complete: lock.complete,
+        native_balance,
+        cw20_balance: cw20_balance?,
+    };
+
+    Ok(lock_info)
 }
 
 #[cfg(test)]
@@ -170,6 +279,7 @@ mod tests {
         // empty funds
         let info = mock_info("anyone", &[]);
         let msg = ExecuteMsg::Lock {
+            id: "1".into(),
             expire: Timestamp::from_seconds(10),
         };
         let res = execute(deps.as_mut(), mock_env(), info, msg);
@@ -181,6 +291,7 @@ mod tests {
         // lower expire
         let info = mock_info("anyone", &coins(2, "token"));
         let msg = ExecuteMsg::Lock {
+            id: "1".into(),
             expire: Timestamp::from_seconds(10),
         };
         let mut env = mock_env();
@@ -195,6 +306,7 @@ mod tests {
         env.block.time = Timestamp::from_seconds(0);
         let info = mock_info("anyone", &coins(2, "token"));
         let msg = ExecuteMsg::Lock {
+            id: "1".into(),
             expire: Timestamp::from_seconds(4000),
         };
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
@@ -205,30 +317,60 @@ mod tests {
 
         // lock funds 1
         let msg = ExecuteMsg::Lock {
+            id: "1".into(),
             expire: Timestamp::from_seconds(200),
         };
         let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock { id: 1 };
+        let msg = QueryMsg::Lock {
+            address: "anyone".into(),
+            id: "1".into(),
+        };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
-        let value: LockResponse = from_binary(&res).unwrap();
+        let value: LockInfo = from_binary(&res).unwrap();
         assert_eq!(0, value.create.seconds());
         assert_eq!(200, value.expire.seconds());
         assert_eq!(false, value.complete);
 
+        // try lock same id
+        let msg = ExecuteMsg::Lock {
+            id: "1".into(),
+            expire: Timestamp::from_seconds(200),
+        };
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        match res {
+            Err(ContractError::AlreadyInUse {}) => {}
+            _ => panic!("Must return AlreadyInUse error"),
+        }
+
         // lock funds 2
         let msg = ExecuteMsg::Lock {
+            id: "2".into(),
             expire: Timestamp::from_seconds(300),
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // should exists lock
-        let msg = QueryMsg::GetLock { id: 2 };
+        let msg = QueryMsg::Lock {
+            address: "anyone".into(),
+            id: "2".into(),
+        };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
-        let value: LockResponse = from_binary(&res).unwrap();
+        let value: LockInfo = from_binary(&res).unwrap();
         assert_eq!(300, value.expire.seconds());
         assert_eq!(false, value.complete);
+
+        let res = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::AllLocks {
+                address: "anyone".into(),
+            },
+        )
+        .unwrap();
+        let value: AllLocksResponse = from_binary(&res).unwrap();
+        assert_eq!(2, value.locks.len())
     }
 
     #[test]
@@ -246,13 +388,14 @@ mod tests {
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(0);
         let msg = ExecuteMsg::Lock {
+            id: "1".into(),
             expire: Timestamp::from_seconds(400),
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // cannot unlock until expire
         let auth_info = mock_info("anyone", &[]);
-        let msg = ExecuteMsg::Unlock { id: 1 };
+        let msg = ExecuteMsg::Unlock { id: "1".into() };
         let mut env = mock_env();
         env.block.time = Timestamp::from_seconds(100);
         let res = execute(deps.as_mut(), env.clone(), auth_info, msg);
@@ -263,7 +406,7 @@ mod tests {
 
         // unlock funds
         let auth_info = mock_info("anyone", &[]);
-        let msg = ExecuteMsg::Unlock { id: 1 };
+        let msg = ExecuteMsg::Unlock { id: "1".into() };
         env.block.time = Timestamp::from_seconds(401);
         let res = execute(deps.as_mut(), env, auth_info, msg).unwrap();
         assert_eq!(1, res.messages.len());
@@ -276,9 +419,13 @@ mod tests {
         );
 
         // should lock completed
-        let data = query(deps.as_ref(), mock_env(), QueryMsg::GetLock { id: 1 }).unwrap();
+        let msg = QueryMsg::Lock {
+            address: "anyone".into(),
+            id: "1".into(),
+        };
+        let data = query(deps.as_ref(), mock_env(), msg).unwrap();
 
-        let res: LockResponse = from_binary(&data).unwrap();
+        let res: LockInfo = from_binary(&data).unwrap();
         assert_eq!(true, res.complete)
     }
 }

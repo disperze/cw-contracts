@@ -1,4 +1,5 @@
 use cosmwasm_std::{Addr, Coin, Timestamp};
+use cw20::{Cw20Coin, Cw20ReceiveMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -12,24 +13,43 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Lock funds until expire timestamp
-    Lock { expire: Timestamp },
+    Lock { id: String, expire: Timestamp },
     /// Unlock funds
-    Unlock { id: u64 },
+    Unlock { id: String },
+    /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
+    Receive(Cw20ReceiveMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiveMsg {
+    Lock { id: String, expire: Timestamp },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns the lock info
-    GetLock { id: u64 },
+    Lock { address: String, id: String },
+    /// Returns the locks by address
+    AllLocks { address: String },
 }
 
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct LockResponse {
+pub struct LockInfo {
+    pub id: String,
     pub owner: Addr,
     pub create: Timestamp,
     pub expire: Timestamp,
-    pub funds: Vec<Coin>,
+    /// Funds in native tokens
+    pub native_balance: Vec<Coin>,
+    /// Funds in cw20 tokens
+    pub cw20_balance: Vec<Cw20Coin>,
     pub complete: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct AllLocksResponse {
+    pub locks: Vec<LockInfo>,
 }
