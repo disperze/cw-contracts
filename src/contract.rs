@@ -230,18 +230,13 @@ fn query_lock(deps: Deps, address: String, id: String) -> StdResult<LockInfo> {
 fn query_locks(deps: Deps, address: String) -> StdResult<AllLocksResponse> {
     let owner_addr = &deps.api.addr_validate(&address)?;
 
-    let locks_result: StdResult<Vec<LockInfo>> = LOCKS
+    let locks_id: Result<Vec<_>, _> = LOCKS
         .prefix(&owner_addr)
-        .range(deps.storage, None, None, Order::Ascending)
-        .map(|item| {
-            let (k, v) = item?;
-            to_lock_info(v, String::from_utf8(k)?)
-        })
+        .keys(deps.storage, None, None, Order::Ascending)
+        .map(String::from_utf8)
         .collect();
 
-    Ok(AllLocksResponse {
-        locks: locks_result?,
-    })
+    Ok(AllLocksResponse { locks: locks_id? })
 }
 
 fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {

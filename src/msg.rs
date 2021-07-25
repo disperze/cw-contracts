@@ -53,5 +53,5 @@ pub struct LockInfo {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AllLocksResponse {
-    pub locks: Vec<LockInfo>,
+    pub locks: Vec<String>,
 }
