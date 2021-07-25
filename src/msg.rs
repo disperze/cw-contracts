@@ -13,9 +13,9 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Lock funds until expire timestamp
-    Lock { expire: Timestamp },
+    Lock { id: String, expire: Timestamp },
     /// Unlock funds
-    Unlock { id: u64 },
+    Unlock { id: String },
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
 }
@@ -23,14 +23,14 @@ pub enum ExecuteMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReceiveMsg {
-    Lock { expire: Timestamp },
+    Lock { id: String, expire: Timestamp },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns the lock info
-    GetLock { address: String, id: u64 },
+    GetLock { address: String, id: String },
     /// Returns the locks by address
     GetLocks { address: String },
 }
