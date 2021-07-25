@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin, Timestamp};
+use cosmwasm_std::{Coin, Timestamp};
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,8 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// Lock funds until expire timestamp
     Lock { id: String, expire: Timestamp },
+    /// Increase previous lock
+    IncreaseLock { id: String },
     /// Unlock funds
     Unlock { id: String },
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
@@ -24,6 +26,7 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ReceiveMsg {
     Lock { id: String, expire: Timestamp },
+    IncreaseLock { id: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -39,7 +42,6 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LockInfo {
     pub id: String,
-    pub owner: Addr,
     pub create: Timestamp,
     pub expire: Timestamp,
     /// Funds in native tokens

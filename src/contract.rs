@@ -3,9 +3,11 @@ use cosmwasm_std::{
     Env, MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
 };
 
+use crate::balance::GenericBalance;
 use crate::error::ContractError;
 use crate::msg::{AllLocksResponse, ExecuteMsg, InstantiateMsg, LockInfo, QueryMsg, ReceiveMsg};
-use crate::state::{GenericBalance, Lock, State, LOCKS, STATE};
+use crate::state::{Lock, State, LOCKS, STATE};
+
 use cw2::set_contract_version;
 use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
@@ -50,6 +52,9 @@ pub fn execute(
             id,
             expire,
         ),
+        ExecuteMsg::IncreaseLock { id } => {
+            try_increase_lock(deps, Balance::from(info.funds), &info.sender, id)
+        }
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
         ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
     }
@@ -83,7 +88,6 @@ pub fn try_lock(
         expire,
         funds: balance.into(),
         complete: false,
-        owner: sender.to_owned(),
     };
     let key = (sender, id.to_owned());
 
@@ -99,6 +103,32 @@ pub fn try_lock(
     })
 }
 
+pub fn try_increase_lock(
+    deps: DepsMut,
+    balance: Balance,
+    sender: &Addr,
+    id: String,
+) -> Result<Response, ContractError> {
+    if balance.is_empty() {
+        return Err(ContractError::EmptyBalance {});
+    }
+
+    let key = (sender, id.to_owned());
+    let mut lock = LOCKS.load(deps.storage, key.clone())?;
+
+    lock.funds.add_tokens(balance);
+    LOCKS.save(deps.storage, key, &lock)?;
+
+    Ok(Response {
+        attributes: vec![
+            attr("action", "increase_lock"),
+            attr("from", sender),
+            attr("id", id),
+        ],
+        ..Response::default()
+    })
+}
+
 pub fn try_unlock(
     deps: DepsMut,
     env: Env,
@@ -107,6 +137,7 @@ pub fn try_unlock(
 ) -> Result<Response, ContractError> {
     let key = (&info.sender, id);
     let mut lock = LOCKS.load(deps.storage, key.clone())?;
+
     if lock.complete {
         return Err(ContractError::LockComplete {});
     }
@@ -142,15 +173,10 @@ pub fn try_recive(
         amount: wrapper.amount,
     });
     let api = deps.api;
+    let sender = &api.addr_validate(&wrapper.sender)?;
     match msg {
-        ReceiveMsg::Lock { id, expire } => try_lock(
-            deps,
-            env,
-            balance,
-            &api.addr_validate(&wrapper.sender)?,
-            id,
-            expire,
-        ),
+        ReceiveMsg::Lock { id, expire } => try_lock(deps, env, balance, sender, id, expire),
+        ReceiveMsg::IncreaseLock { id } => try_increase_lock(deps, balance, sender, id),
     }
 }
 
@@ -235,7 +261,6 @@ fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
 
     let lock_info = LockInfo {
         id,
-        owner: lock.owner,
         create: lock.create,
         expire: lock.expire,
         complete: lock.complete,
@@ -250,7 +275,7 @@ fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError};
 
     #[test]
     fn proper_initialization() {
@@ -371,6 +396,50 @@ mod tests {
         .unwrap();
         let value: AllLocksResponse = from_binary(&res).unwrap();
         assert_eq!(2, value.locks.len())
+    }
+
+    #[test]
+    fn increase_lock() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            max_lock_time: 3600,
+        };
+        let info = mock_info("creator", &[]);
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // lock funds
+        let mut env = mock_env();
+        let info = mock_info("anyone", &coins(2, "token"));
+        env.block.time = Timestamp::from_seconds(100);
+        let msg = ExecuteMsg::Lock {
+            id: "1".into(),
+            expire: Timestamp::from_seconds(200),
+        };
+        let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // try increase lock invalid id
+        let info = mock_info("anyone", &coins(5, "token"));
+        let msg = ExecuteMsg::IncreaseLock { id: "2".into() };
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
+        match res {
+            Err(ContractError::Std(StdError::NotFound { .. })) => {}
+            _ => panic!("Must return StdError::NotFound error"),
+        }
+
+        // increase valid lock
+        let msg = ExecuteMsg::IncreaseLock { id: "1".into() };
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // query funds lock
+        let msg = QueryMsg::Lock {
+            address: "anyone".into(),
+            id: "1".into(),
+        };
+        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+        let value: LockInfo = from_binary(&res).unwrap();
+        assert_eq!(coins(7, "token"), value.native_balance);
     }
 
     #[test]
