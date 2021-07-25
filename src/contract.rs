@@ -1,12 +1,10 @@
-use cosmwasm_std::{
-    attr, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdResult, Timestamp,
-};
+use cosmwasm_std::{attr, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Timestamp, from_binary, Addr, WasmMsg, CosmosMsg};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg};
-use crate::state::{State, LOCKS, STATE};
+use crate::msg::{ExecuteMsg, InstantiateMsg, LockResponse, QueryMsg, ReceiveMsg};
+use crate::state::{State, LOCKS, STATE, Lock, GenericBalance};
 use cw2::set_contract_version;
+use cw20::{Cw20ReceiveMsg, Balance, Cw20CoinVerified, Cw20ExecuteMsg, Cw20Coin};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-lockbox";
@@ -42,18 +40,20 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Lock { expire } => try_lock(deps, env, info, expire),
+        ExecuteMsg::Lock { expire } => try_lock(deps, env, Balance::from(info.funds), &info.sender, expire),
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
+        ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
     }
 }
 
 pub fn try_lock(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    balance: Balance,
+    sender: &Addr,
     expire: Timestamp,
 ) -> Result<Response, ContractError> {
-    if info.funds.is_empty() {
+    if balance.is_empty() {
         return Err(ContractError::EmptyBalance {});
     }
 
@@ -68,12 +68,25 @@ pub fn try_lock(
         return Err(ContractError::HighExpired {});
     }
 
-    let lock_data = LockResponse {
+    let lock_funds = match balance {
+        Balance::Native(balance) => GenericBalance {
+            native: balance.0,
+            cw20: vec![],
+        },
+        Balance::Cw20(token) => {
+            GenericBalance {
+                native: vec![],
+                cw20: vec![token],
+            }
+        }
+    };
+
+    let lock_data = Lock {
         create: env.block.time,
         expire,
-        funds: info.funds,
+        funds: lock_funds,
         complete: false,
-        owner: info.sender.clone(),
+        owner: sender.to_owned(),
     };
 
     state.current += 1;
@@ -83,7 +96,7 @@ pub fn try_lock(
     Ok(Response {
         attributes: vec![
             attr("action", "lock"),
-            attr("from", info.sender),
+            attr("from", sender),
             attr("id", state.current),
         ],
         ..Response::default()
@@ -109,19 +122,67 @@ pub fn try_unlock(
     lock.complete = true;
     LOCKS.save(deps.storage, &key, &lock)?;
 
-    let bank_send = BankMsg::Send {
-        amount: lock.funds,
-        to_address: info.sender.clone().into(),
-    }
-    .into();
+    // unlock all tokens
+    let messages = send_tokens(&info.sender, &lock.funds)?;
 
     let res = Response {
-        messages: vec![bank_send],
+        messages,
         attributes: vec![attr("action", "unlock"), attr("from", info.sender)],
         ..Response::default()
     };
 
     Ok(res)
+}
+
+pub fn try_recive(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    wrapper: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    let msg: ReceiveMsg = from_binary(&wrapper.msg)?;
+    let balance = Balance::Cw20(Cw20CoinVerified {
+        address: info.sender,
+        amount: wrapper.amount,
+    });
+    let api = deps.api;
+    match msg {
+        ReceiveMsg::Lock {expire} => {
+            try_lock(deps, env, balance, &api.addr_validate(&wrapper.sender)?, expire)
+        }
+    }
+}
+
+fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>> {
+    let native_balance = &balance.native;
+    let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
+        vec![]
+    } else {
+        vec![BankMsg::Send {
+            to_address: to.into(),
+            amount: native_balance.to_vec(),
+        }
+            .into()]
+    };
+
+    let cw20_balance = &balance.cw20;
+    let cw20_msgs: StdResult<Vec<_>> = cw20_balance
+        .iter()
+        .map(|c| {
+            let msg = Cw20ExecuteMsg::Transfer {
+                recipient: to.into(),
+                amount: c.amount,
+            };
+            let exec = WasmMsg::Execute {
+                contract_addr: c.address.to_string(),
+                msg: to_binary(&msg)?,
+                send: vec![],
+            };
+            Ok(exec.into())
+        })
+        .collect();
+    msgs.append(&mut cw20_msgs?);
+    Ok(msgs)
 }
 
 #[entry_point]
@@ -133,8 +194,30 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn query_lock(deps: Deps, id: u64) -> StdResult<LockResponse> {
     let lock = LOCKS.load(deps.storage, &id.to_string())?;
+    // transform tokens
+    let native_balance = lock.funds.native;
 
-    Ok(lock)
+    let cw20_balance: StdResult<Vec<_>> = lock
+        .funds
+        .cw20
+        .into_iter()
+        .map(|token| {
+            Ok(Cw20Coin {
+                address: token.address.into(),
+                amount: token.amount,
+            })
+        })
+        .collect();
+
+    let details = LockResponse {
+        owner: lock.owner,
+        create: lock.create,
+        expire: lock.expire,
+        complete: lock.complete,
+        native_balance,
+        cw20_balance: cw20_balance?,
+    };
+    Ok(details)
 }
 
 #[cfg(test)]
