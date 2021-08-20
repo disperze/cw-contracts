@@ -1,32 +1,13 @@
 [package]
-name = "cw-wjuno"
+name = "cw-disper-wrap"
 version = "0.4.2"
 authors = ["Giancarlos Salas <giansalex@gmail.com>"]
 edition = "2018"
-description = "CosmWasm contract for wrapped JUNO into CW20"
+description = "CosmWasm contract for wrapped native coin into CW20"
 repository = "https://github.com/giansalex/cw-wjuno"
-
-exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "wjuno.wasm",
-  "hash.txt",
-]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-
-[profile.release]
-opt-level = 3
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = true
 
 [features]
 # for more explicit tests, cargo test --features=backtraces
