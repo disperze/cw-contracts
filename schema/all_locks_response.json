@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AllLocksResponse",
+  "type": "object",
+  "required": [
+    "locks"
+  ],
+  "properties": {
+    "locks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
