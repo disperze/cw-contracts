@@ -9,10 +9,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-defaults:
-  run:
-    working-directory: 'contracts/lockbox'
-
 jobs:
 
   test:
@@ -21,8 +17,6 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-        with:
-          path: ${{ github.workspace }}
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
