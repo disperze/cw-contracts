@@ -231,7 +231,7 @@ fn query_locks(deps: Deps, address: String) -> StdResult<AllLocksResponse> {
     let owner_addr = &deps.api.addr_validate(&address)?;
 
     let locks_id: Result<Vec<_>, _> = LOCKS
-        .prefix(&owner_addr)
+        .prefix(owner_addr)
         .keys(deps.storage, None, None, Order::Ascending)
         .map(String::from_utf8)
         .collect();
