@@ -158,6 +158,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-disper-split"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-storage-plus",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-disper-wrap"
 version = "0.4.2"
 dependencies = [
