@@ -1,4 +1,4 @@
-name: Lockbox-CI
+name: cw-CI
 
 on:
   push:
