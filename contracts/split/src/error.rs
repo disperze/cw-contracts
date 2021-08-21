@@ -13,6 +13,9 @@ pub enum ContractError {
     #[error("Min 2 users are required")]
     MinUsers {},
 
+    #[error("Empty Balance")]
+    EmptyBalance {},
+
     #[error("Invalid math calc")]
     MathCalc {},
 

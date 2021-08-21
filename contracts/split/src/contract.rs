@@ -69,17 +69,20 @@ pub fn try_split(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
         env.contract.address.to_string(),
         state.native_coin.to_owned(),
     )?;
-    let mut user = USERS.load(deps.storage, &info.sender)?;
+    if balance.amount.is_zero() {
+        return Err(ContractError::EmptyBalance {});
+    }
 
+    let mut user = USERS.load(deps.storage, &info.sender)?;
     let to_send = user
         .percent
         .mul(balance.amount.add(state.total_split))
         .checked_sub(user.split)
         .map_err(|_| ContractError::MathCalc {})?;
 
-    // if balance.amount.eq(&to_send) {
-    //     USERS.keys(deps.storage, None, None, Order::Ascending);
-    // }
+    if to_send.is_zero() {
+        return Err(ContractError::EmptyBalance {});
+    }
 
     user.split += to_send;
     state.total_split += to_send;
