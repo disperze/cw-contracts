@@ -2,6 +2,7 @@ use crate::error::ContractError;
 
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{State, UserParams, STATE, USERS};
+use crate::utils::has_unique_elements;
 use cosmwasm_std::{
     attr, entry_point, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
     Uint128,
@@ -19,6 +20,10 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     if msg.users.is_empty() || msg.users.len() < 2 {
         return Err(ContractError::MinUsers {});
+    }
+
+    if !has_unique_elements(msg.users.clone().into_iter().map(|u| u.address)) {
+        return Err(ContractError::DuplicateUsers {});
     }
 
     let total = msg
@@ -115,6 +120,28 @@ mod tests {
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
+        let users = vec![
+            User {
+                address: Addr::unchecked("user1"),
+                percent: Decimal::percent(15),
+            },
+            User {
+                address: Addr::unchecked("user1"),
+                percent: Decimal::percent(85),
+            },
+        ];
+        let msg = InstantiateMsg {
+            native_coin: "dev".into(),
+            users,
+        };
+        let info = mock_info("creator", &[]);
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::DuplicateUsers { .. }) => {}
+            _ => panic!("Must return DuplicateUsers error"),
+        }
+
         let mut users = vec![
             User {
                 address: Addr::unchecked("user1"),
@@ -138,7 +165,7 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg);
         match res {
             Err(ContractError::InvalidPercentage { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
+            _ => panic!("Must return InvalidPercentage error"),
         }
 
         users.push(User {
