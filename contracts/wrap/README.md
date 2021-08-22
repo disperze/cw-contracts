@@ -1,4 +1,3 @@
-# WJUNO
-[![Rust-CI](https://github.com/giansalex/cw-wjuno/actions/workflows/rust.yml/badge.svg)](https://github.com/giansalex/cw-wjuno/actions/workflows/rust.yml)
+# Wrap
 
-CosmWasm contract for wrapped JUNO into CW20
+CosmWasm contract for wrap native coins into CW20.

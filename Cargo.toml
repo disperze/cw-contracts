@@ -5,6 +5,10 @@ members = ["contracts/*"]
 codegen-units = 1
 incremental = false
 
+[profile.release.package.cw-disper-split]
+codegen-units = 1
+incremental = false
+
 [profile.release.package.cw-disper-wrap]
 codegen-units = 1
 incremental = false

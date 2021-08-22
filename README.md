@@ -8,3 +8,4 @@
 | ---- | ---- |
 |Wrap  | [Source](./contracts/wrap) |
 |Lockbox  | [Source](./contracts/lockbox) |
+|Split    | [Source](./contracts/split) |
