@@ -2,10 +2,10 @@
 
 [![cw-CI](https://github.com/disperze/cw-contracts/actions/workflows/cw.yml/badge.svg)](https://github.com/disperze/cw-contracts/actions/workflows/cw.yml)
 
-## Contracts
+## List
 
-| Name |      |
-| ---- | ---- |
-|Wrap  | [Source](./contracts/wrap) |
-|Lockbox  | [Source](./contracts/lockbox) |
-|Split    | [Source](./contracts/split) |
+| Contract |      |
+| -------- | ---- |
+|Wrap      | [Source](./contracts/wrap) |
+|Lockbox   | [Source](./contracts/lockbox) |
+|Split     | [Source](./contracts/split) |
