@@ -122,7 +122,7 @@ pub fn execute_withdraw(
 
     OFFERINGS.remove(deps.storage, &offering_id);
 
-    return Ok(Response {
+    Ok(Response {
         messages: vec![exec_cw721_transfer],
         attributes: vec![
             attr("action", "withdraw_nft"),
@@ -130,7 +130,7 @@ pub fn execute_withdraw(
             attr("offering_id", offering_id),
         ],
         ..Response::default()
-    });
+    })
 }
 
 pub fn execute_receive_nft(
