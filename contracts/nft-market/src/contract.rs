@@ -1,4 +1,4 @@
-use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, from_binary, attr, WasmMsg, CosmosMsg};
+use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, from_binary, attr, WasmMsg, CosmosMsg, BankMsg};
 
 use cw2::set_contract_version;
 use crate::error::ContractError;
@@ -41,6 +41,53 @@ pub fn execute(
         ExecuteMsg::WithdrawNft { offering_id } => execute_withdraw(deps, info, offering_id),
         ExecuteMsg::ReceiveNft(msg) => execute_receive_nft(deps, info, msg),
     }
+}
+
+pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Result<Response, ContractError> {
+    // check if offering exists
+    let off = OFFERINGS.load(&deps.storage, &offering_id)?;
+
+    // check for enough coins
+    if info.funds.le(&off.list_price)  {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // create transfer msg
+    let transfer_msg: CosmosMsg = BankMsg::Send {
+        to_address: off.seller.into(),
+        amount: info.funds,
+    }
+    .into();
+
+    // create transfer cw721 msg
+    let cw721_transfer = Cw721ExecuteMsg::TransferNft {
+        recipient: info.sender.into(),
+        token_id: off.token_id.clone(),
+    };
+    let cw721_transfer_msg: CosmosMsg = WasmMsg::Execute {
+        contract_addr: deps.api.human_address(&off.contract_addr)?,
+        msg: to_binary(&cw721_transfer)?,
+        send: vec![],
+    }
+    .into();
+
+    //delete offering
+    OFFERINGS.remove(deps.storage, &offering_id);
+
+    let price_string = format!("{} {}", info.funds[0].amount, info.sender);
+
+    Ok(Response {
+        messages: vec![transfer_msg, cw721_transfer_msg],
+        attributes: vec![
+            attr("action", "buy_nft"),
+            attr("buyer", info.sender),
+            attr("seller", off.seller),
+            attr("paid_price", price_string),
+            attr("token_id", off.token_id),
+            attr("nft_contract", off.contract),
+        ],
+        ..Response::default()
+    })
 }
 
 pub fn execute_withdraw(deps: DepsMut, info: MessageInfo, offering_id: String) -> Result<Response, ContractError> {
