@@ -5,11 +5,19 @@
     {
       "type": "object",
       "required": [
-        "increment"
+        "buy"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "buy": {
+          "type": "object",
+          "required": [
+            "offering_id"
+          ],
+          "properties": {
+            "offering_id": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -17,23 +25,66 @@
     {
       "type": "object",
       "required": [
-        "reset"
+        "withdraw_nft"
       ],
       "properties": {
-        "reset": {
+        "withdraw_nft": {
           "type": "object",
           "required": [
-            "count"
+            "offering_id"
           ],
           "properties": {
-            "count": {
-              "type": "integer",
-              "format": "int32"
+            "offering_id": {
+              "type": "string"
             }
           }
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "receive_nft"
+      ],
+      "properties": {
+        "receive_nft": {
+          "$ref": "#/definitions/Cw721ReceiveMsg"
+        }
+      },
+      "additionalProperties": false
     }
-  ]
+  ],
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "Cw721ReceiveMsg": {
+      "description": "Cw721ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg",
+      "type": "object",
+      "required": [
+        "sender",
+        "token_id"
+      ],
+      "properties": {
+        "msg": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Binary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sender": {
+          "type": "string"
+        },
+        "token_id": {
+          "type": "string"
+        }
+      }
+    }
+  }
 }
