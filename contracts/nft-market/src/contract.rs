@@ -1,10 +1,13 @@
-use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, from_binary, attr, WasmMsg, CosmosMsg, BankMsg};
+use cosmwasm_std::{
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Response, StdResult, WasmMsg,
+};
 
-use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SellNft};
-use crate::state::{State, STATE, increment_offerings, Offering, OFFERINGS, get_fund};
-use cw721::{Cw721ReceiveMsg, Cw721ExecuteMsg};
+use crate::state::{get_fund, increment_offerings, Offering, State, OFFERINGS, STATE};
+use cw2::set_contract_version;
+use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
@@ -43,13 +46,17 @@ pub fn execute(
     }
 }
 
-pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Result<Response, ContractError> {
+pub fn execute_buy(
+    deps: DepsMut,
+    info: MessageInfo,
+    offering_id: String,
+) -> Result<Response, ContractError> {
     // check if offering exists
     let off = OFFERINGS.load(deps.storage, &offering_id)?;
 
     // check for enough coins
     let off_fund = get_fund(info.funds.clone(), off.list_price.denom)?;
-    if off_fund.amount < off.list_price.amount  {
+    if off_fund.amount < off.list_price.amount {
         return Err(ContractError::InsufficientFunds {});
     }
 
@@ -91,7 +98,11 @@ pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Res
     })
 }
 
-pub fn execute_withdraw(deps: DepsMut, info: MessageInfo, offering_id: String) -> Result<Response, ContractError> {
+pub fn execute_withdraw(
+    deps: DepsMut,
+    info: MessageInfo,
+    offering_id: String,
+) -> Result<Response, ContractError> {
     let off = OFFERINGS.load(deps.storage, &offering_id)?;
     if off.seller.ne(&info.sender) {
         return Err(ContractError::Unauthorized {});
@@ -122,7 +133,11 @@ pub fn execute_withdraw(deps: DepsMut, info: MessageInfo, offering_id: String) -
     });
 }
 
-pub fn execute_receive_nft(deps: DepsMut, info: MessageInfo, wrapper: Cw721ReceiveMsg) -> Result<Response, ContractError> {
+pub fn execute_receive_nft(
+    deps: DepsMut,
+    info: MessageInfo,
+    wrapper: Cw721ReceiveMsg,
+) -> Result<Response, ContractError> {
     let msg: SellNft = match wrapper.msg {
         Some(bin) => Ok(from_binary(&bin)?),
         None => Err(ContractError::NoData {}),
@@ -162,7 +177,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn query_count(deps: Deps) -> StdResult<CountResponse> {
     let state = STATE.load(deps.storage)?;
-    Ok(CountResponse { count: state.num_offerings })
+    Ok(CountResponse {
+        count: state.num_offerings,
+    })
 }
 
 #[cfg(test)]
@@ -175,7 +192,7 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg { };
+        let msg = InstantiateMsg {};
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
@@ -192,7 +209,7 @@ mod tests {
     fn increment() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let msg = InstantiateMsg { };
+        let msg = InstantiateMsg {};
         let info = mock_info("creator", &coins(2, "token"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
@@ -211,7 +228,7 @@ mod tests {
     fn reset() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let msg = InstantiateMsg { };
+        let msg = InstantiateMsg {};
         let info = mock_info("creator", &coins(2, "token"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 

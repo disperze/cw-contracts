@@ -1,9 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::error::ContractError;
 use cosmwasm_std::{Addr, Coin, Storage};
 use cw_storage_plus::{Item, Map};
-use crate::error::ContractError;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
@@ -36,7 +36,7 @@ pub fn increment_offerings(store: &mut dyn Storage) -> Result<u64, ContractError
 pub fn get_fund(funds: Vec<Coin>, denom: String) -> Result<Coin, ContractError> {
     for fund in funds.into_iter() {
         if fund.denom == denom {
-            return Ok(fund)
+            return Ok(fund);
         }
     }
 
