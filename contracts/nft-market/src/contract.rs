@@ -1,10 +1,10 @@
-use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, from_binary, attr};
+use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, from_binary, attr, WasmMsg, CosmosMsg};
 
 use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SellNft};
 use crate::state::{State, STATE, increment_offerings, Offering, OFFERINGS};
-use cw721::Cw721ReceiveMsg;
+use cw721::{Cw721ReceiveMsg, Cw721ExecuteMsg};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
@@ -37,9 +37,41 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        ExecuteMsg::Buy { offering_id } => execute_buy(deps, info, offering_id),
         ExecuteMsg::WithdrawNft { offering_id } => execute_withdraw(deps, info, offering_id),
         ExecuteMsg::ReceiveNft(msg) => execute_receive_nft(deps, info, msg),
     }
+}
+
+pub fn execute_withdraw(deps: DepsMut, info: MessageInfo, offering_id: String) -> Result<Response, ContractError> {
+    let off = OFFERINGS.load(&deps.storage, &offering_id)?;
+    if off.seller == deps.api.canonical_address(&info.sender)? {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let transfer_cw721_msg = Cw721ExecuteMsg::TransferNft {
+        recipient: off.seller.into(),
+        token_id: off.token_id.clone(),
+    };
+
+    let exec_cw721_transfer: CosmosMsg = WasmMsg::Execute {
+        contract_addr: deps.api.human_address(&off.contract_addr)?,
+        msg: to_binary(&transfer_cw721_msg)?,
+        send: vec![],
+    }
+    .into();
+
+    OFFERINGS.remove(deps.storage, &offering_id);
+
+    return Ok(Response {
+        messages: vec![exec_cw721_transfer],
+        attributes: vec![
+            attr("action", "withdraw_nft"),
+            attr("seller", info.sender),
+            attr("offering_id", offering_id),
+        ],
+        ..Response::default()
+    });
 }
 
 pub fn execute_receive_nft(deps: DepsMut, info: MessageInfo, wrapper: Cw721ReceiveMsg) -> Result<Response, ContractError> {
