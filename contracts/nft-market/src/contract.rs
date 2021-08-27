@@ -45,10 +45,10 @@ pub fn execute(
 
 pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Result<Response, ContractError> {
     // check if offering exists
-    let off = OFFERINGS.load(&deps.storage, &offering_id)?;
+    let off = OFFERINGS.load(deps.storage, &offering_id)?;
 
     // check for enough coins
-    if info.funds.le(&off.list_price)  {
+    if info.funds.le(&vec![off.list_price])  {
         return Err(ContractError::InsufficientFunds {});
     }
 
@@ -65,7 +65,7 @@ pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Res
         token_id: off.token_id.clone(),
     };
     let cw721_transfer_msg: CosmosMsg = WasmMsg::Execute {
-        contract_addr: deps.api.human_address(&off.contract_addr)?,
+        contract_addr: off.contract.into(),
         msg: to_binary(&cw721_transfer)?,
         send: vec![],
     }
@@ -74,7 +74,7 @@ pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Res
     //delete offering
     OFFERINGS.remove(deps.storage, &offering_id);
 
-    let price_string = format!("{} {}", info.funds[0].amount, info.sender);
+    let price_string = format!("{} {}", info.funds[0].amount, info.funds[0].denom);
 
     Ok(Response {
         messages: vec![transfer_msg, cw721_transfer_msg],
@@ -91,8 +91,8 @@ pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Res
 }
 
 pub fn execute_withdraw(deps: DepsMut, info: MessageInfo, offering_id: String) -> Result<Response, ContractError> {
-    let off = OFFERINGS.load(&deps.storage, &offering_id)?;
-    if off.seller == deps.api.canonical_address(&info.sender)? {
+    let off = OFFERINGS.load(deps.storage, &offering_id)?;
+    if off.seller.ne(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -102,7 +102,7 @@ pub fn execute_withdraw(deps: DepsMut, info: MessageInfo, offering_id: String) -
     };
 
     let exec_cw721_transfer: CosmosMsg = WasmMsg::Execute {
-        contract_addr: deps.api.human_address(&off.contract_addr)?,
+        contract_addr: off.contract.into(),
         msg: to_binary(&transfer_cw721_msg)?,
         send: vec![],
     }
@@ -134,12 +134,12 @@ pub fn execute_receive_nft(deps: DepsMut, info: MessageInfo, wrapper: Cw721Recei
     let off = Offering {
         contract: info.sender.clone(),
         token_id: wrapper.token_id,
-        seller: wrapper.sender.into(),
+        seller: deps.api.addr_validate(&wrapper.sender)?,
         list_price: msg.list_price.clone(),
     };
     OFFERINGS.save(deps.storage, &id, &off)?;
 
-    let price_string = format!("{} {}", msg.list_price.amount, msg.list_price.address);
+    let price_string = format!("{} {}", msg.list_price.amount, msg.list_price.denom);
     Ok(Response {
         attributes: vec![
             attr("action", "sell_nft"),
@@ -152,26 +152,6 @@ pub fn execute_receive_nft(deps: DepsMut, info: MessageInfo, wrapper: Cw721Recei
     })
 }
 
-pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
-
-    Ok(Response::default())
-}
-
-pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
-            return Err(ContractError::Unauthorized {});
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(Response::default())
-}
-
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -181,7 +161,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn query_count(deps: Deps) -> StdResult<CountResponse> {
     let state = STATE.load(deps.storage)?;
-    Ok(CountResponse { count: state.count })
+    Ok(CountResponse { count: state.num_offerings })
 }
 
 #[cfg(test)]
