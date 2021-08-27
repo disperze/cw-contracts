@@ -3,7 +3,7 @@ use cosmwasm_std::{entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageIn
 use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SellNft};
-use crate::state::{State, STATE, increment_offerings, Offering, OFFERINGS};
+use crate::state::{State, STATE, increment_offerings, Offering, OFFERINGS, get_fund};
 use cw721::{Cw721ReceiveMsg, Cw721ExecuteMsg};
 
 // version info for migration info
@@ -48,24 +48,25 @@ pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Res
     let off = OFFERINGS.load(deps.storage, &offering_id)?;
 
     // check for enough coins
-    if info.funds.le(&vec![off.list_price])  {
+    let off_fund = get_fund(info.funds.clone(), off.list_price.denom)?;
+    if off_fund.amount < off.list_price.amount  {
         return Err(ContractError::InsufficientFunds {});
     }
 
     // create transfer msg
     let transfer_msg: CosmosMsg = BankMsg::Send {
-        to_address: off.seller.into(),
+        to_address: off.seller.clone().into(),
         amount: info.funds,
     }
     .into();
 
     // create transfer cw721 msg
     let cw721_transfer = Cw721ExecuteMsg::TransferNft {
-        recipient: info.sender.into(),
+        recipient: info.sender.clone().into(),
         token_id: off.token_id.clone(),
     };
     let cw721_transfer_msg: CosmosMsg = WasmMsg::Execute {
-        contract_addr: off.contract.into(),
+        contract_addr: off.contract.clone().into(),
         msg: to_binary(&cw721_transfer)?,
         send: vec![],
     }
@@ -74,7 +75,7 @@ pub fn execute_buy(deps: DepsMut, info: MessageInfo, offering_id: String) -> Res
     //delete offering
     OFFERINGS.remove(deps.storage, &offering_id);
 
-    let price_string = format!("{} {}", info.funds[0].amount, info.funds[0].denom);
+    let price_string = format!("{} {}", off_fund.amount, off_fund.denom);
 
     Ok(Response {
         messages: vec![transfer_msg, cw721_transfer_msg],

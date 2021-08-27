@@ -32,3 +32,13 @@ pub fn increment_offerings(store: &mut dyn Storage) -> Result<u64, ContractError
 
     Ok(num)
 }
+
+pub fn get_fund(funds: Vec<Coin>, denom: String) -> Result<Coin, ContractError> {
+    for fund in funds.into_iter() {
+        if fund.denom == denom {
+            return Ok(fund)
+        }
+    }
+
+    Err(ContractError::InsufficientFunds {})
+}
