@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, CanonicalAddr, Coin, DepsMut, Response, Storage};
+use cosmwasm_std::{Addr, Coin, Storage};
 use cw_storage_plus::{Item, Map};
 use crate::error::ContractError;
 
