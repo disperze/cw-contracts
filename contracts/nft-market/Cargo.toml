@@ -1,0 +1,23 @@
+[package]
+name = "cw-dsp-nft-market"
+version = "0.1.0"
+authors = ["Giancarlos Salas <giansalex@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+
+[dependencies]
+cosmwasm-std = { version = "0.14.1" }
+cosmwasm-storage = { version = "0.14.1" }
+cw-storage-plus = "0.6.2"
+schemars = "0.8.1"
+serde = { version = "1.0.125", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.24" }
+
+[dev-dependencies]
+cosmwasm-schema = { version = "0.14.1" }
