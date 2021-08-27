@@ -16,6 +16,7 @@ cosmwasm-std = { version = "0.14.1" }
 cosmwasm-storage = { version = "0.14.1" }
 cw-storage-plus = "0.6.2"
 cw2 = "0.6.2"
+cw721 = "0.6.2"
 schemars = "0.8.1"
 serde = { version = "1.0.125", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.24" }
