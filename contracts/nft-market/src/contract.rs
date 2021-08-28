@@ -1,17 +1,23 @@
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, WasmMsg,
+    MessageInfo, Order, Response, StdResult, WasmMsg,
 };
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg, SellNft};
-use crate::state::{get_fund, increment_offerings, Offering, State, OFFERINGS, STATE};
+use crate::msg::{
+    CountResponse, ExecuteMsg, InstantiateMsg, Offer, OffersResponse, QueryMsg, SellNft,
+};
+use crate::state::{get_fund, increment_offerings, maybe_addr, Offering, State, OFFERINGS, STATE};
 use cw2::set_contract_version;
 use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
+use cw_storage_plus::Bound;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const DEFAULT_LIMIT: u32 = 10;
+const MAX_LIMIT: u32 = 30;
 
 #[entry_point]
 pub fn instantiate(
@@ -172,6 +178,9 @@ pub fn execute_receive_nft(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::AllOffers { start_after, limit } => {
+            to_binary(&query_all(deps, start_after, limit)?)
+        }
     }
 }
 
@@ -180,6 +189,31 @@ fn query_count(deps: Deps) -> StdResult<CountResponse> {
     Ok(CountResponse {
         count: state.num_offerings,
     })
+}
+fn query_all(
+    deps: Deps,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<OffersResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start_addr = maybe_addr(deps.api, start_after)?;
+    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+
+    let offers: StdResult<Vec<Offer>> = OFFERINGS
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.map(|(k, v)| Offer {
+                id: String::from_utf8_lossy(&k).to_string(),
+                token_id: v.token_id,
+                contract: v.contract,
+                seller: v.seller,
+                list_price: v.list_price,
+            })
+        })
+        .collect();
+
+    Ok(OffersResponse { offers: offers? })
 }
 
 #[cfg(test)]

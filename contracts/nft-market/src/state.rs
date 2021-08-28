@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use cosmwasm_std::{Addr, Coin, Storage};
+use cosmwasm_std::{Addr, Api, Coin, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -41,4 +41,8 @@ pub fn get_fund(funds: Vec<Coin>, denom: String) -> Result<Coin, ContractError> 
     }
 
     Err(ContractError::InsufficientFunds {})
+}
+
+pub fn maybe_addr(api: &dyn Api, human: Option<String>) -> StdResult<Option<Addr>> {
+    human.map(|x| api.addr_validate(&x)).transpose()
 }
