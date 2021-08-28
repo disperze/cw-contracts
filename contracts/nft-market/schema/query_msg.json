@@ -13,6 +13,35 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "With Enumerable extension. Requires pagination. Lists all offers controlled by the contract. Return type: OffersResponse.",
+      "type": "object",
+      "required": [
+        "all_offers"
+      ],
+      "properties": {
+        "all_offers": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }
