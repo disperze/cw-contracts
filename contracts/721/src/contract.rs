@@ -179,13 +179,13 @@ pub fn _transfer_nft(
     recipient: &str,
     token_id: &str,
 ) -> Result<TokenInfo, ContractError> {
-    let mut token = tokens().load(deps.storage, &token_id)?;
+    let mut token = tokens().load(deps.storage, token_id)?;
     // ensure we have permissions
     check_can_send(deps.as_ref(), env, info, &token)?;
     // set owner and remove existing approvals
     token.owner = deps.api.addr_validate(recipient)?;
     token.approvals = vec![];
-    tokens().save(deps.storage, &token_id, &token)?;
+    tokens().save(deps.storage, token_id, &token)?;
     Ok(token)
 }
 
@@ -244,7 +244,7 @@ pub fn _update_approvals(
     add: bool,
     expires: Option<Expiration>,
 ) -> Result<TokenInfo, ContractError> {
-    let mut token = tokens().load(deps.storage, &token_id)?;
+    let mut token = tokens().load(deps.storage, token_id)?;
     // ensure we have permissions
     check_can_approve(deps.as_ref(), env, info, &token)?;
 
@@ -270,7 +270,7 @@ pub fn _update_approvals(
         token.approvals.push(approval);
     }
 
-    tokens().save(deps.storage, &token_id, &token)?;
+    tokens().save(deps.storage, token_id, &token)?;
 
     Ok(token)
 }
