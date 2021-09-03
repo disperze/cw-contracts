@@ -143,6 +143,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-disper-721"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw0",
+ "cw2",
+ "cw721",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-disper-lockbox"
 version = "0.2.0"
 dependencies = [
@@ -247,6 +262,18 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "cw721"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea1d0566c544c81a0f03810f197ed2815fffa9765144f75305169f9bab225085"
+dependencies = [
+ "cosmwasm-std",
+ "cw0",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
