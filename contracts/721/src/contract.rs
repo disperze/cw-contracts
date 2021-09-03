@@ -37,8 +37,11 @@ pub fn instantiate(
         symbol: msg.symbol,
     };
     CONTRACT_INFO.save(deps.storage, &info)?;
-    let minter = deps.api.addr_validate(&msg.minter)?;
-    MINTER.save(deps.storage, &minter)?;
+    if let Some(minter_value) = msg.minter {
+        let minter = deps.api.addr_validate(&minter_value)?;
+        MINTER.save(deps.storage, &minter)?;
+    }
+
     Ok(Response::default())
 }
 
@@ -81,10 +84,12 @@ pub fn execute_mint(
     info: MessageInfo,
     msg: MintMsg,
 ) -> Result<Response, ContractError> {
-    let minter = MINTER.load(deps.storage)?;
+    let minter = MINTER.may_load(deps.storage)?;
 
-    if info.sender != minter {
-        return Err(ContractError::Unauthorized {});
+    if let Some(minter_value) = minter {
+        if info.sender != minter_value {
+            return Err(ContractError::Unauthorized {});
+        }
     }
 
     // create the token
@@ -602,7 +607,7 @@ mod tests {
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
             symbol: SYMBOL.to_string(),
-            minter: String::from(MINTER),
+            minter: Some(String::from(MINTER)),
         };
         let info = mock_info("creator", &[]);
         let res = instantiate(deps, mock_env(), info, msg).unwrap();
@@ -616,7 +621,7 @@ mod tests {
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
             symbol: SYMBOL.to_string(),
-            minter: String::from(MINTER),
+            minter: Some(String::from(MINTER)),
         };
         let info = mock_info("creator", &[]);
 
