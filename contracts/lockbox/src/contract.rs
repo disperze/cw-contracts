@@ -56,7 +56,7 @@ pub fn execute(
             try_increase_lock(deps, env, Balance::from(info.funds), &info.sender, id)
         }
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
-        ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
+        ExecuteMsg::Receive(msg) => try_receive(deps, env, info, msg),
     }
 }
 
@@ -157,7 +157,7 @@ pub fn try_unlock(
     Ok(res)
 }
 
-pub fn try_recive(
+pub fn try_receive(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
