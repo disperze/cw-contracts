@@ -149,7 +149,6 @@ pub fn execute_receive_nft(
         None => Err(ContractError::NoData {}),
     }?;
 
-    // TODO: check if same token Id form same original contract is already on sale
     let id = increment_offerings(deps.storage)?.to_string();
 
     // save Offering
