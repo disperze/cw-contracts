@@ -1,9 +1,7 @@
 use cosmwasm_std::{attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg};
 
 use crate::error::ContractError;
-use crate::msg::{
-    CountResponse, ExecuteMsg, InstantiateMsg, Offer, OffersResponse, QueryMsg, SellNft,
-};
+use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, Offer, OffersResponse, QueryMsg, SellNft, FeeResponse};
 use crate::state::{get_fund, increment_offerings, maybe_addr, Offering, State, OFFERINGS, STATE};
 use cw2::set_contract_version;
 use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
@@ -227,6 +225,7 @@ pub fn execute_change_fee(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetFee {} => to_binary(&query_fee(deps)?),
         QueryMsg::GetOffer { contract, token_id } => {
             to_binary(&query_token_id(deps, contract, token_id)?)
         }
@@ -247,6 +246,14 @@ fn query_count(deps: Deps) -> StdResult<CountResponse> {
         count: state.num_offerings,
     })
 }
+
+fn query_fee(deps: Deps) -> StdResult<FeeResponse> {
+    let state = STATE.load(deps.storage)?;
+    Ok(FeeResponse {
+        fee: state.fee,
+    })
+}
+
 fn query_all(
     deps: Deps,
     start_after: Option<String>,

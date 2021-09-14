@@ -3,9 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cw_dsp_nft_market::msg::{
-    CountResponse, ExecuteMsg, InstantiateMsg, Offer, OffersResponse, QueryMsg, SellNft,
-};
+use cw_dsp_nft_market::msg::{CountResponse, ExecuteMsg, InstantiateMsg, Offer, OffersResponse, QueryMsg, SellNft, FeeResponse};
 use cw_dsp_nft_market::state::State;
 
 fn main() {
@@ -20,6 +18,7 @@ fn main() {
     export_schema(&schema_for!(State), &out_dir);
     export_schema(&schema_for!(SellNft), &out_dir);
     export_schema(&schema_for!(CountResponse), &out_dir);
+    export_schema(&schema_for!(FeeResponse), &out_dir);
     export_schema(&schema_for!(Offer), &out_dir);
     export_schema(&schema_for!(OffersResponse), &out_dir);
 }
