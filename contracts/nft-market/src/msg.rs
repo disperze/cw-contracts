@@ -29,7 +29,7 @@ pub enum QueryMsg {
         token_id: String,
     },
     GetOffers {
-        seller: Addr,
+        seller: String,
         start_after: Option<String>,
         limit: Option<u32>,
     },

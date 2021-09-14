@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
     Env, MessageInfo, Order, Response, StdResult, WasmMsg,
 };
 
@@ -217,18 +217,19 @@ fn query_all(
 
 fn query_tokens(
     deps: Deps,
-    seller: Addr,
+    seller: String,
     start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<OffersResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_addr = maybe_addr(deps.api, start_after)?;
     let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+    let address = deps.api.addr_validate(&seller)?;
 
     let offers: StdResult<Vec<Offer>> = OFFERINGS
         .range(deps.storage, start, None, Order::Ascending)
         .filter(|item| match item {
-            Ok((_, v)) => v.seller == seller,
+            Ok((_, v)) => v.seller == address,
             Err(..) => false,
         })
         .take(limit)
@@ -316,7 +317,7 @@ mod tests {
         assert_eq!("1", value.offers.first().unwrap().token_id);
 
         let msg = QueryMsg::GetOffers {
-            seller: Addr::unchecked("owner"),
+            seller: "owner".into(),
             limit: None,
             start_after: None,
         };
