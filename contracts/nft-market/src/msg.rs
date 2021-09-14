@@ -24,6 +24,15 @@ pub struct SellNft {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetCount {},
+    GetOffer {
+        contract: String,
+        token_id: String,
+    },
+    GetOffers {
+        seller: Addr,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     /// With Enumerable extension.
     /// Requires pagination. Lists all offers controlled by the contract.
     /// Return type: OffersResponse.
