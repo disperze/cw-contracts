@@ -2,12 +2,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use cosmwasm_std::{Addr, Api, Coin, StdResult, Storage};
+use cosmwasm_std::{Addr, Api, Coin, Decimal, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
     pub num_offerings: u64,
+    pub fee: Decimal,
     pub owner: Addr,
 }
 

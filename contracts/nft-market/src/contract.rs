@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
-    Env, MessageInfo, Order, Response, StdResult, WasmMsg,
+    attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps,
+    DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg,
 };
 
 use crate::error::ContractError;
@@ -11,6 +11,7 @@ use crate::state::{get_fund, increment_offerings, maybe_addr, Offering, State, O
 use cw2::set_contract_version;
 use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
 use cw_storage_plus::Bound;
+use std::ops::{Mul, Sub};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
@@ -24,12 +25,13 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    _msg: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let state = State {
         num_offerings: 0,
+        fee: msg.fee,
         owner: info.sender,
     };
     STATE.save(deps.storage, &state)?;
@@ -66,10 +68,12 @@ pub fn execute_buy(
         return Err(ContractError::InsufficientFunds {});
     }
 
+    let state = STATE.load(deps.storage)?;
+    let net_amount = Decimal::one().sub(state.fee).mul(off_fund.amount);
     // create transfer msg
     let transfer_msg: CosmosMsg = BankMsg::Send {
         to_address: off.seller.clone().into(),
-        amount: info.funds,
+        amount: vec![coin(net_amount.u128(), off_fund.denom.clone())],
     }
     .into();
 
@@ -265,11 +269,13 @@ fn map_offer((k, v): (Vec<u8>, Offering)) -> Offer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::coin;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coins, Decimal};
 
     fn setup(deps: DepsMut) {
-        let msg = InstantiateMsg {};
+        let msg = InstantiateMsg {
+            fee: Decimal::percent(2),
+        };
         let info = mock_info("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
@@ -280,7 +286,9 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InstantiateMsg {};
+        let msg = InstantiateMsg {
+            fee: Decimal::percent(2),
+        };
         let info = mock_info("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
@@ -303,7 +311,7 @@ mod tests {
             msg: Some(to_binary(&sell_msg).unwrap()),
         });
         let info = mock_info("nft-collectibles", &[]);
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         assert_eq!(0, res.messages.len());
 
@@ -325,5 +333,39 @@ mod tests {
         let value: OffersResponse = from_binary(&res).unwrap();
 
         assert_eq!(1, value.offers.len());
+    }
+
+    #[test]
+    fn buy_nft() {
+        let mut deps = mock_dependencies(&[]);
+        setup(deps.as_mut());
+
+        let sell_msg = SellNft {
+            list_price: coin(1000, "earth"),
+        };
+
+        let msg = ExecuteMsg::ReceiveNft(Cw721ReceiveMsg {
+            token_id: "1".into(),
+            sender: "owner".into(),
+            msg: Some(to_binary(&sell_msg).unwrap()),
+        });
+        let info = mock_info("nft-collectibles", &[]);
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let msg = ExecuteMsg::Buy {
+            offering_id: "1".into(),
+        };
+        let info = mock_info("anyone", &coins(1000, "earth"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        assert_eq!(2, res.messages.len());
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                to_address: "owner".into(),
+                amount: coins(980, "earth")
+            })
+        );
     }
 }
