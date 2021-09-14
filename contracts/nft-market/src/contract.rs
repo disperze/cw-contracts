@@ -53,53 +53,6 @@ pub fn execute(
     }
 }
 
-pub fn execute_withdraw_fees(
-    deps: DepsMut,
-    info: MessageInfo,
-    amount: u128,
-    denom: String,
-) -> Result<Response, ContractError> {
-    let state = STATE.load(deps.storage)?;
-
-    if state.owner.ne(&info.sender) {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    let transfer: CosmosMsg = BankMsg::Send {
-        to_address: state.owner.into(),
-        amount: vec![coin(amount, denom)],
-    }
-    .into();
-
-    Ok(Response {
-        messages: vec![transfer],
-        ..Response::default()
-    })
-}
-
-pub fn execute_change_fee(
-    deps: DepsMut,
-    info: MessageInfo,
-    fee: Decimal,
-) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if state.owner.ne(&info.sender) {
-            return Err(ContractError::Unauthorized {});
-        }
-
-        state.fee = fee;
-        Ok(state)
-    })?;
-
-    Ok(Response {
-        attributes: vec![
-            attr("action", "change_fee"),
-            attr("fee", fee),
-        ],
-        ..Response::default()
-    })
-}
-
 pub fn execute_buy(
     deps: DepsMut,
     info: MessageInfo,
@@ -218,6 +171,53 @@ pub fn execute_receive_nft(
             attr("seller", off.seller),
             attr("list_price", price_string),
             attr("token_id", off.token_id),
+        ],
+        ..Response::default()
+    })
+}
+
+pub fn execute_withdraw_fees(
+    deps: DepsMut,
+    info: MessageInfo,
+    amount: u128,
+    denom: String,
+) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+
+    if state.owner.ne(&info.sender) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let transfer: CosmosMsg = BankMsg::Send {
+        to_address: state.owner.into(),
+        amount: vec![coin(amount, denom)],
+    }
+        .into();
+
+    Ok(Response {
+        messages: vec![transfer],
+        ..Response::default()
+    })
+}
+
+pub fn execute_change_fee(
+    deps: DepsMut,
+    info: MessageInfo,
+    fee: Decimal,
+) -> Result<Response, ContractError> {
+    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+        if state.owner.ne(&info.sender) {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        state.fee = fee;
+        Ok(state)
+    })?;
+
+    Ok(Response {
+        attributes: vec![
+            attr("action", "change_fee"),
+            attr("fee", fee),
         ],
         ..Response::default()
     })
