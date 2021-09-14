@@ -1,7 +1,13 @@
-use cosmwasm_std::{attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg};
+use cosmwasm_std::{
+    attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps,
+    DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg,
+};
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, Offer, OffersResponse, QueryMsg, SellNft, FeeResponse};
+use crate::msg::{
+    CountResponse, ExecuteMsg, FeeResponse, InstantiateMsg, Offer, OffersResponse, QueryMsg,
+    SellNft,
+};
 use crate::state::{get_fund, increment_offerings, maybe_addr, Offering, State, OFFERINGS, STATE};
 use cw2::set_contract_version;
 use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
@@ -46,7 +52,9 @@ pub fn execute(
         ExecuteMsg::Buy { offering_id } => execute_buy(deps, info, offering_id),
         ExecuteMsg::WithdrawNft { offering_id } => execute_withdraw(deps, info, offering_id),
         ExecuteMsg::ReceiveNft(msg) => execute_receive_nft(deps, info, msg),
-        ExecuteMsg::WithdrawFees { amount, denom } => execute_withdraw_fees(deps, info, amount, denom),
+        ExecuteMsg::WithdrawFees { amount, denom } => {
+            execute_withdraw_fees(deps, info, amount, denom)
+        }
         ExecuteMsg::ChangeFee { fee } => execute_change_fee(deps, info, fee),
     }
 }
@@ -190,7 +198,7 @@ pub fn execute_withdraw_fees(
         to_address: state.owner.into(),
         amount: vec![coin(amount, denom)],
     }
-        .into();
+    .into();
 
     Ok(Response {
         messages: vec![transfer],
@@ -213,10 +221,7 @@ pub fn execute_change_fee(
     })?;
 
     Ok(Response {
-        attributes: vec![
-            attr("action", "change_fee"),
-            attr("fee", fee),
-        ],
+        attributes: vec![attr("action", "change_fee"), attr("fee", fee)],
         ..Response::default()
     })
 }
@@ -249,9 +254,7 @@ fn query_count(deps: Deps) -> StdResult<CountResponse> {
 
 fn query_fee(deps: Deps) -> StdResult<FeeResponse> {
     let state = STATE.load(deps.storage)?;
-    Ok(FeeResponse {
-        fee: state.fee,
-    })
+    Ok(FeeResponse { fee: state.fee })
 }
 
 fn query_all(
@@ -456,7 +459,7 @@ mod tests {
         setup(deps.as_mut());
 
         let msg = ExecuteMsg::ChangeFee {
-            fee: Decimal::percent(3)
+            fee: Decimal::percent(3),
         };
         let info = mock_info("anyone", &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
