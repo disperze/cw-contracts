@@ -421,4 +421,57 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn withdraw_fees() {
+        let mut deps = mock_dependencies(&coins(1000, "earth"));
+        setup(deps.as_mut());
+
+        let msg = ExecuteMsg::WithdrawFees {
+            amount: 1000,
+            denom: "earth".into(),
+        };
+        let info = mock_info("anyone", &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return Unauthorized error"),
+        }
+
+        let info = mock_info("creator", &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(1, res.messages.len());
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                to_address: "creator".into(),
+                amount: coins(1000, "earth")
+            })
+        );
+    }
+
+    #[test]
+    fn change_fee() {
+        let mut deps = mock_dependencies(&[]);
+        setup(deps.as_mut());
+
+        let msg = ExecuteMsg::ChangeFee {
+            fee: Decimal::percent(3)
+        };
+        let info = mock_info("anyone", &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return Unauthorized error"),
+        }
+
+        let info = mock_info("creator", &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let msg = QueryMsg::GetFee {};
+        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
+        let value: FeeResponse = from_binary(&res).unwrap();
+        assert_eq!(Decimal::percent(3), value.fee);
+    }
 }
