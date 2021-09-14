@@ -17,6 +17,18 @@
     {
       "type": "object",
       "required": [
+        "get_fee"
+      ],
+      "properties": {
+        "get_fee": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "get_offer"
       ],
       "properties": {
