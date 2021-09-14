@@ -1,7 +1,4 @@
-use cosmwasm_std::{
-    attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg,
-};
+use cosmwasm_std::{attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -51,7 +48,56 @@ pub fn execute(
         ExecuteMsg::Buy { offering_id } => execute_buy(deps, info, offering_id),
         ExecuteMsg::WithdrawNft { offering_id } => execute_withdraw(deps, info, offering_id),
         ExecuteMsg::ReceiveNft(msg) => execute_receive_nft(deps, info, msg),
+        ExecuteMsg::WithdrawFees { amount, denom } => execute_withdraw_fees(deps, info, amount, denom),
+        ExecuteMsg::ChangeFee { fee } => execute_change_fee(deps, info, fee),
     }
+}
+
+pub fn execute_withdraw_fees(
+    deps: DepsMut,
+    info: MessageInfo,
+    amount: u128,
+    denom: String,
+) -> Result<Response, ContractError> {
+    let state = STATE.load(deps.storage)?;
+
+    if state.owner.ne(&info.sender) {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let transfer: CosmosMsg = BankMsg::Send {
+        to_address: state.owner.into(),
+        amount: vec![coin(amount, denom)],
+    }
+    .into();
+
+    Ok(Response {
+        messages: vec![transfer],
+        ..Response::default()
+    })
+}
+
+pub fn execute_change_fee(
+    deps: DepsMut,
+    info: MessageInfo,
+    fee: Decimal,
+) -> Result<Response, ContractError> {
+    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+        if state.owner.ne(&info.sender) {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        state.fee = fee;
+        Ok(state)
+    })?;
+
+    Ok(Response {
+        attributes: vec![
+            attr("action", "change_fee"),
+            attr("fee", fee),
+        ],
+        ..Response::default()
+    })
 }
 
 pub fn execute_buy(
