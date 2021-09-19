@@ -512,8 +512,7 @@ fn query_tokens(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_addr = maybe_addr(deps.api, start_after)?;
-    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+    let start = start_after.map(Bound::exclusive);
 
     let owner_addr = deps.api.addr_validate(&owner)?;
     let res: Result<Vec<_>, _> = tokens()
@@ -541,8 +540,7 @@ fn query_all_tokens(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_addr = maybe_addr(deps.api, start_after)?;
-    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+    let start = start_after.map(Bound::exclusive);
 
     let tokens: StdResult<Vec<String>> = tokens()
         .range(deps.storage, start, None, Order::Ascending)
