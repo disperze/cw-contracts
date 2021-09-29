@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin, Decimal};
+use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cw721::Cw721ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ pub enum ExecuteMsg {
     ReceiveNft(Cw721ReceiveMsg),
     /// only admin.
     WithdrawFees {
-        amount: u128,
+        amount: Uint128,
         denom: String,
     },
     /// only admin.

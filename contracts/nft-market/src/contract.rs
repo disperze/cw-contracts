@@ -1,7 +1,4 @@
-use cosmwasm_std::{
-    attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps,
-    DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg,
-};
+use cosmwasm_std::{attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg, Uint128};
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -185,7 +182,7 @@ pub fn execute_receive_nft(
 pub fn execute_withdraw_fees(
     deps: DepsMut,
     info: MessageInfo,
-    amount: u128,
+    amount: Uint128,
     denom: String,
 ) -> Result<Response, ContractError> {
     let state = STATE.load(deps.storage)?;
@@ -196,7 +193,7 @@ pub fn execute_withdraw_fees(
 
     let transfer: CosmosMsg = BankMsg::Send {
         to_address: state.owner.into(),
-        amount: vec![coin(amount, denom)],
+        amount: vec![coin(amount.into(), denom)],
     }
     .into();
 
@@ -431,7 +428,7 @@ mod tests {
         setup(deps.as_mut());
 
         let msg = ExecuteMsg::WithdrawFees {
-            amount: 1000,
+            amount: 1000u32.into(),
             denom: "earth".into(),
         };
         let info = mock_info("anyone", &[]);
