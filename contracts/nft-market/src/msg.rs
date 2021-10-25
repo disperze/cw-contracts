@@ -1,5 +1,5 @@
 use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
-use cw721::Cw721ReceiveMsg;
+use crate::cw721::Cw721ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

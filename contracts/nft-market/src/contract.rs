@@ -1,4 +1,4 @@
-use cosmwasm_std::{attr, coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg, Uint128};
+use cosmwasm_std::{coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg, Uint128};
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -7,9 +7,9 @@ use crate::msg::{
 };
 use crate::state::{get_fund, increment_offerings, maybe_addr, Offering, State, OFFERINGS, STATE};
 use cw2::set_contract_version;
-use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
 use cw_storage_plus::Bound;
 use std::ops::{Mul, Sub};
+use crate::cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
@@ -87,27 +87,22 @@ pub fn execute_buy(
     let cw721_transfer_msg: CosmosMsg = WasmMsg::Execute {
         contract_addr: off.contract.clone().into(),
         msg: to_binary(&cw721_transfer)?,
-        send: vec![],
+        funds: vec![],
     }
     .into();
 
-    //delete offering
     OFFERINGS.remove(deps.storage, &offering_id);
 
-    let price_string = format!("{} {}", off_fund.amount, off_fund.denom);
-
-    Ok(Response {
-        messages: vec![transfer_msg, cw721_transfer_msg],
-        attributes: vec![
-            attr("action", "buy_nft"),
-            attr("buyer", info.sender),
-            attr("seller", off.seller),
-            attr("paid_price", price_string),
-            attr("token_id", off.token_id),
-            attr("nft_contract", off.contract),
-        ],
-        ..Response::default()
-    })
+    let price_string = format!("{}{}", off_fund.amount, off_fund.denom);
+    let res = Response::new()
+        .add_attribute("action", "buy_nft")
+        .add_attribute("buyer", info.sender)
+        .add_attribute("seller", off.seller)
+        .add_attribute("paid_price", price_string)
+        .add_attribute("token_id", off.token_id)
+        .add_attribute("nft_contract", off.contract)
+        .add_messages(vec![transfer_msg, cw721_transfer_msg]);
+    Ok(res)
 }
 
 pub fn execute_withdraw(
@@ -128,21 +123,18 @@ pub fn execute_withdraw(
     let exec_cw721_transfer: CosmosMsg = WasmMsg::Execute {
         contract_addr: off.contract.into(),
         msg: to_binary(&transfer_cw721_msg)?,
-        send: vec![],
+        funds: vec![],
     }
     .into();
 
     OFFERINGS.remove(deps.storage, &offering_id);
 
-    Ok(Response {
-        messages: vec![exec_cw721_transfer],
-        attributes: vec![
-            attr("action", "withdraw_nft"),
-            attr("seller", info.sender),
-            attr("offering_id", offering_id),
-        ],
-        ..Response::default()
-    })
+    let res = Response::new()
+        .add_attribute("action", "withdraw_nft")
+        .add_attribute("seller", info.sender)
+        .add_attribute("offering_id", offering_id)
+        .add_message(exec_cw721_transfer);
+    Ok(res)
 }
 
 pub fn execute_receive_nft(
@@ -150,11 +142,7 @@ pub fn execute_receive_nft(
     info: MessageInfo,
     wrapper: Cw721ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    let msg: SellNft = match wrapper.msg {
-        Some(bin) => Ok(from_binary(&bin)?),
-        None => Err(ContractError::NoData {}),
-    }?;
-
+    let msg: SellNft = from_binary(&wrapper.msg)?;
     let id = increment_offerings(deps.storage)?.to_string();
 
     // save Offering
@@ -166,17 +154,14 @@ pub fn execute_receive_nft(
     };
     OFFERINGS.save(deps.storage, &id, &off)?;
 
-    let price_string = format!("{} {}", msg.list_price.amount, msg.list_price.denom);
-    Ok(Response {
-        attributes: vec![
-            attr("action", "sell_nft"),
-            attr("nft_contract", info.sender),
-            attr("seller", off.seller),
-            attr("list_price", price_string),
-            attr("token_id", off.token_id),
-        ],
-        ..Response::default()
-    })
+    let price_string = format!("{}{}", msg.list_price.amount, msg.list_price.denom);
+    let res = Response::new()
+        .add_attribute("action", "sell_nft")
+        .add_attribute("nft_contract", info.sender)
+        .add_attribute("seller", off.seller)
+        .add_attribute("list_price", price_string)
+        .add_attribute("token_id", off.token_id);
+    Ok(res)
 }
 
 pub fn execute_withdraw_fees(
@@ -197,10 +182,7 @@ pub fn execute_withdraw_fees(
     }
     .into();
 
-    Ok(Response {
-        messages: vec![transfer],
-        ..Response::default()
-    })
+    Ok(Response::new().add_message(transfer))
 }
 
 pub fn execute_change_fee(
@@ -217,10 +199,10 @@ pub fn execute_change_fee(
         Ok(state)
     })?;
 
-    Ok(Response {
-        attributes: vec![attr("action", "change_fee"), attr("fee", fee)],
-        ..Response::default()
-    })
+    let res = Response::new()
+        .add_attribute("action", "change_fee")
+        .add_attribute("fee", fee.to_string());
+    Ok(res)
 }
 
 #[entry_point]
@@ -322,8 +304,8 @@ fn map_offer((k, v): (Vec<u8>, Offering)) -> Offer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Decimal};
+    use cosmwasm_std::testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info};
+    use cosmwasm_std::{coins, Decimal, SubMsg};
 
     fn setup(deps: DepsMut) {
         let msg = InstantiateMsg {
@@ -337,7 +319,7 @@ mod tests {
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             fee: Decimal::percent(2),
@@ -351,7 +333,7 @@ mod tests {
 
     #[test]
     fn sell_nft() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         setup(deps.as_mut());
 
         let sell_msg = SellNft {
@@ -361,7 +343,7 @@ mod tests {
         let msg = ExecuteMsg::ReceiveNft(Cw721ReceiveMsg {
             token_id: "1".into(),
             sender: "owner".into(),
-            msg: Some(to_binary(&sell_msg).unwrap()),
+            msg: to_binary(&sell_msg).unwrap(),
         });
         let info = mock_info("nft-collectibles", &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -390,7 +372,7 @@ mod tests {
 
     #[test]
     fn buy_nft() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         setup(deps.as_mut());
 
         let sell_msg = SellNft {
@@ -400,7 +382,7 @@ mod tests {
         let msg = ExecuteMsg::ReceiveNft(Cw721ReceiveMsg {
             token_id: "1".into(),
             sender: "owner".into(),
-            msg: Some(to_binary(&sell_msg).unwrap()),
+            msg: to_binary(&sell_msg).unwrap(),
         });
         let info = mock_info("nft-collectibles", &[]);
         let res = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap();
@@ -415,16 +397,16 @@ mod tests {
         assert_eq!(2, res.messages.len());
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
                 to_address: "owner".into(),
                 amount: coins(980, "earth")
-            })
+            }))
         );
     }
 
     #[test]
     fn withdraw_fees() {
-        let mut deps = mock_dependencies(&coins(1000, "earth"));
+        let mut deps = mock_dependencies_with_balance(&coins(1000, "earth"));
         setup(deps.as_mut());
 
         let msg = ExecuteMsg::WithdrawFees {
@@ -443,16 +425,16 @@ mod tests {
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
                 to_address: "creator".into(),
                 amount: coins(1000, "earth")
-            })
+            }))
         );
     }
 
     #[test]
     fn change_fee() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         setup(deps.as_mut());
 
         let msg = ExecuteMsg::ChangeFee {
