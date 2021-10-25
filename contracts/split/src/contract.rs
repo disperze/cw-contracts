@@ -4,8 +4,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{State, UserParams, STATE, USERS};
 use crate::utils::has_unique_elements;
 use cosmwasm_std::{
-    entry_point, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    Uint128,
+    entry_point, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128,
 };
 use std::ops::{Add, Mul};
 
@@ -111,7 +110,9 @@ pub fn try_split(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
 mod tests {
     use super::*;
     use crate::msg::User;
-    use cosmwasm_std::testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    };
     use cosmwasm_std::{coin, coins, Addr, Decimal, SubMsg};
 
     #[test]

@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
-    Env, MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
+    entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
 };
 
 use crate::balance::GenericBalance;
@@ -264,7 +264,9 @@ fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    };
     use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, StdResult, SubMsg};
 
     #[test]

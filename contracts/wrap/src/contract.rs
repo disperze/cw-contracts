@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    entry_point, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128,
+    entry_point, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdResult, Uint128,
 };
 
 use crate::error::ContractError;
@@ -189,7 +189,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    };
     use cosmwasm_std::{coin, coins, from_binary, SubMsg};
     use cw20::BalanceResponse;
 
