@@ -13,6 +13,9 @@ pub enum ContractError {
     #[error("Insufficient funds")]
     InsufficientFunds {},
 
+    #[error("Invalid buyer")]
+    InvalidBuyer {},
+
     #[error("No data in ReceiveMsg")]
     NoData {},
 }

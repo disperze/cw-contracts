@@ -67,6 +67,10 @@ pub fn execute_buy(
     // check if offering exists
     let off = OFFERINGS.load(deps.storage, &offering_id)?;
 
+    if off.seller.eq(&info.sender) {
+        return Err(ContractError::InvalidBuyer {});
+    }
+
     // check for enough coins
     let off_fund = get_fund(info.funds.clone(), off.list_price.denom)?;
     if off_fund.amount < off.list_price.amount {
@@ -309,24 +313,14 @@ mod tests {
 
         assert_eq!(0, res.messages.len());
 
-        let msg = QueryMsg::GetOffer {
-            contract: "nft-collectibles".into(),
-            token_id: "1".into(),
+        let msg = QueryMsg::AllOffers {
+            start_after: None,
+            limit: None,
         };
         let res = query(deps.as_ref(), mock_env(), msg).unwrap();
         let value: OffersResponse = from_binary(&res).unwrap();
 
         assert_eq!("1", value.offers.first().unwrap().token_id);
-
-        let msg = QueryMsg::GetOffers {
-            seller: "owner".into(),
-            limit: None,
-            start_after: None,
-        };
-        let res = query(deps.as_ref(), mock_env(), msg).unwrap();
-        let value: OffersResponse = from_binary(&res).unwrap();
-
-        assert_eq!(1, value.offers.len());
     }
 
     #[test]
@@ -350,6 +344,20 @@ mod tests {
         let msg = ExecuteMsg::Buy {
             offering_id: "1".into(),
         };
+        let info = mock_info("owner", &coins(1000, "earth"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
+        match res {
+            Err(ContractError::InvalidBuyer {}) => {}
+            _ => panic!("Must return InvalidBuyer error"),
+        }
+
+        let info = mock_info("anyone", &coins(400, "earth"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg.clone());
+        match res {
+            Err(ContractError::InsufficientFunds {}) => {}
+            _ => panic!("Must return InsufficientFunds error"),
+        }
+
         let info = mock_info("anyone", &coins(1000, "earth"));
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
