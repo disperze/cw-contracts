@@ -37,7 +37,7 @@ pub fn instantiate(
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
-        total_supply: Uint128::new(0),
+        total_supply: Uint128::zero(),
         mint: Some(MinterData {
             minter: env.contract.address,
             cap: None,
