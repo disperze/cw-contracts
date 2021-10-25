@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut,
-    Env, MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
+    entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
 };
 
 use crate::balance::GenericBalance;
@@ -96,10 +96,11 @@ pub fn try_lock(
         Some(_) => Err(ContractError::AlreadyInUse {}),
     })?;
 
-    Ok(Response {
-        attributes: vec![attr("action", "lock"), attr("from", sender), attr("id", id)],
-        ..Response::default()
-    })
+    let res = Response::new()
+        .add_attribute("action", "lock")
+        .add_attribute("from", sender)
+        .add_attribute("id", id);
+    Ok(res)
 }
 
 pub fn try_increase_lock(
@@ -123,14 +124,11 @@ pub fn try_increase_lock(
     lock.funds.add_tokens(balance);
     LOCKS.save(deps.storage, key, &lock)?;
 
-    Ok(Response {
-        attributes: vec![
-            attr("action", "increase_lock"),
-            attr("from", sender),
-            attr("id", id),
-        ],
-        ..Response::default()
-    })
+    let res = Response::new()
+        .add_attribute("action", "increase_lock")
+        .add_attribute("from", sender)
+        .add_attribute("id", id);
+    Ok(res)
 }
 
 pub fn try_unlock(
@@ -152,12 +150,10 @@ pub fn try_unlock(
     // remove lock
     LOCKS.remove(deps.storage, key);
 
-    let res = Response {
-        messages,
-        attributes: vec![attr("action", "unlock"), attr("from", info.sender)],
-        ..Response::default()
-    };
-
+    let res = Response::new()
+        .add_attribute("action", "unlock")
+        .add_attribute("from", info.sender)
+        .add_messages(messages);
     Ok(res)
 }
 
@@ -203,7 +199,7 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
             let exec = WasmMsg::Execute {
                 contract_addr: c.address.to_string(),
                 msg: to_binary(&msg)?,
-                send: vec![],
+                funds: vec![],
             };
             Ok(exec.into())
         })
@@ -268,12 +264,14 @@ fn to_lock_info(lock: Lock, id: String) -> StdResult<LockInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, StdResult};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    };
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, StdResult, SubMsg};
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             max_lock_time: 3600,
@@ -287,7 +285,7 @@ mod tests {
 
     #[test]
     fn lock() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             max_lock_time: 3600,
@@ -392,7 +390,7 @@ mod tests {
 
     #[test]
     fn increase_lock() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             max_lock_time: 3600,
@@ -447,7 +445,7 @@ mod tests {
 
     #[test]
     fn unlock() {
-        let mut deps = mock_dependencies(&coins(2, "token"));
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
         let msg = InstantiateMsg {
             max_lock_time: 3600,
@@ -484,10 +482,10 @@ mod tests {
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
                 to_address: "anyone".into(),
                 amount: coins(2, "token")
-            })
+            }))
         );
 
         // should lock completed

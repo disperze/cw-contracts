@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, entry_point, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128,
+    entry_point, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Response, StdResult, Uint128,
 };
 
 use crate::error::ContractError;
@@ -37,7 +37,7 @@ pub fn instantiate(
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
-        total_supply: Uint128(0),
+        total_supply: Uint128::new(0),
         mint: Some(MinterData {
             minter: env.contract.address,
             cap: None,
@@ -134,16 +134,11 @@ pub fn try_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
         deposit.amount,
     )?;
 
-    let attributes = vec![
-        attr("action", "deposit"),
-        attr("amount", deposit.amount),
-        attr("sender", info.sender),
-    ];
-
-    Ok(Response {
-        attributes,
-        ..Response::default()
-    })
+    let res = Response::new()
+        .add_attribute("action", "deposit")
+        .add_attribute("amount", deposit.amount)
+        .add_attribute("sender", info.sender);
+    Ok(res)
 }
 
 pub fn try_withdraw(
@@ -162,15 +157,12 @@ pub fn try_withdraw(
         amount: vec![Coin::new(amount.into(), state.native_coin)],
     });
 
-    Ok(Response {
-        messages: vec![bank_send],
-        attributes: vec![
-            attr("action", "withdraw"),
-            attr("amount", amount),
-            attr("sender", info.sender),
-        ],
-        ..Response::default()
-    })
+    let res = Response::new()
+        .add_attribute("action", "withdraw")
+        .add_attribute("amount", amount)
+        .add_attribute("sender", info.sender)
+        .add_message(bank_send);
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -197,13 +189,15 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, from_binary};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    };
+    use cosmwasm_std::{coin, coins, from_binary, SubMsg};
     use cw20::BalanceResponse;
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
@@ -220,7 +214,7 @@ mod tests {
 
     #[test]
     fn deposit() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
@@ -259,12 +253,12 @@ mod tests {
         )
         .unwrap();
         let response: BalanceResponse = from_binary(&data).unwrap();
-        assert_eq!(response.balance, Uint128(20));
+        assert_eq!(response.balance, 20u8.into());
     }
 
     #[test]
     fn withdraw() {
-        let mut deps = mock_dependencies(&coins(1000u32.into(), "juno"));
+        let mut deps = mock_dependencies_with_balance(&coins(1000u32.into(), "juno"));
 
         let msg = InstantiateMsg {
             native_coin: "juno".into(),
@@ -292,10 +286,10 @@ mod tests {
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
                 amount: vec![coin(amount_withdraw.into(), "juno")],
                 to_address: "creator".into(),
-            })
+            }))
         );
 
         // check balance query

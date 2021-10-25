@@ -4,8 +4,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{State, UserParams, STATE, USERS};
 use crate::utils::has_unique_elements;
 use cosmwasm_std::{
-    attr, entry_point, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response,
-    Uint128,
+    entry_point, BankMsg, Coin, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, Uint128,
 };
 use std::ops::{Add, Mul};
 
@@ -52,7 +51,7 @@ pub fn instantiate(
     };
     STATE.save(deps.storage, &state)?;
 
-    Ok(Response::default())
+    Ok(Response::new())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -99,27 +98,26 @@ pub fn try_split(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
         amount: vec![Coin::new(to_send.into(), state.native_coin)],
     });
 
-    Ok(Response {
-        messages: vec![bank_send],
-        attributes: vec![
-            attr("action", "split"),
-            attr("amount", to_send),
-            attr("sender", info.sender),
-        ],
-        ..Response::default()
-    })
+    let res = Response::new()
+        .add_attribute("action", "split")
+        .add_attribute("amount", to_send)
+        .add_attribute("sender", info.sender)
+        .add_message(bank_send);
+    Ok(res)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::msg::User;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, Addr, Decimal};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    };
+    use cosmwasm_std::{coin, coins, Addr, Decimal, SubMsg};
 
     #[test]
     fn proper_initialization() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let users = vec![
             User {
                 address: Addr::unchecked("user1"),
@@ -183,7 +181,7 @@ mod tests {
     #[test]
     fn split() {
         let balance = [coin(100, "dev")];
-        let mut deps = mock_dependencies(&balance);
+        let mut deps = mock_dependencies_with_balance(&balance);
         let users = vec![
             User {
                 address: Addr::unchecked("user1"),
@@ -212,10 +210,10 @@ mod tests {
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
                 to_address: "user1".into(),
                 amount: coins(30, "dev")
-            })
+            }))
         );
     }
 }
