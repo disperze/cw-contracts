@@ -210,14 +210,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
         QueryMsg::GetFee {} => to_binary(&query_fee(deps)?),
-        QueryMsg::GetOffer { contract, token_id } => {
-            to_binary(&query_token_id(deps, contract, token_id)?)
-        }
-        QueryMsg::GetOffers {
-            seller,
-            start_after,
-            limit,
-        } => to_binary(&query_tokens(deps, seller, start_after, limit)?),
         QueryMsg::AllOffers { start_after, limit } => {
             to_binary(&query_all(deps, start_after, limit)?)
         }
@@ -248,43 +240,6 @@ fn query_all(
     let offers: StdResult<Vec<Offer>> = OFFERINGS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|item| item.map(map_offer))
-        .collect();
-
-    Ok(OffersResponse { offers: offers? })
-}
-
-fn query_tokens(
-    deps: Deps,
-    seller: String,
-    start_after: Option<String>,
-    limit: Option<u32>,
-) -> StdResult<OffersResponse> {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_addr = maybe_addr(deps.api, start_after)?;
-    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
-    let address = deps.api.addr_validate(&seller)?;
-
-    let offers: StdResult<Vec<Offer>> = OFFERINGS
-        .range(deps.storage, start, None, Order::Ascending)
-        .filter(|item| match item {
-            Ok((_, v)) => v.seller == address,
-            Err(..) => false,
-        })
-        .take(limit)
-        .map(|item| item.map(map_offer))
-        .collect();
-
-    Ok(OffersResponse { offers: offers? })
-}
-
-fn query_token_id(deps: Deps, contract: String, token_id: String) -> StdResult<OffersResponse> {
-    let offers: StdResult<Vec<Offer>> = OFFERINGS
-        .range(deps.storage, None, None, Order::Ascending)
-        .filter(|item| match item {
-            Ok((_, v)) => v.contract == contract && v.token_id == token_id,
-            Err(..) => false,
-        })
         .map(|item| item.map(map_offer))
         .collect();
 

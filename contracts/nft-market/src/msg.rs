@@ -40,15 +40,6 @@ pub struct SellNft {
 pub enum QueryMsg {
     GetCount {},
     GetFee {},
-    GetOffer {
-        contract: String,
-        token_id: String,
-    },
-    GetOffers {
-        seller: String,
-        start_after: Option<String>,
-        limit: Option<u32>,
-    },
     /// With Enumerable extension.
     /// Requires pagination. Lists all offers controlled by the contract.
     /// Return type: OffersResponse.
