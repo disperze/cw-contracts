@@ -16,4 +16,3 @@ pub struct Cw721ReceiveMsg {
     pub token_id: String,
     pub msg: Binary,
 }
-

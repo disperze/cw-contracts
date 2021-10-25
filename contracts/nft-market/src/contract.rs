@@ -1,15 +1,18 @@
-use cosmwasm_std::{coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, WasmMsg, Uint128};
+use cosmwasm_std::{
+    coin, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Decimal, Deps, DepsMut,
+    Env, MessageInfo, Order, Response, StdResult, Uint128, WasmMsg,
+};
 
+use crate::cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
 use crate::error::ContractError;
 use crate::msg::{
     CountResponse, ExecuteMsg, FeeResponse, InstantiateMsg, Offer, OffersResponse, QueryMsg,
     SellNft,
 };
-use crate::state::{get_fund, increment_offerings, maybe_addr, Offering, State, OFFERINGS, STATE};
+use crate::state::{get_fund, increment_offerings, Offering, State, OFFERINGS, STATE};
 use cw2::set_contract_version;
 use cw_storage_plus::Bound;
 use std::ops::{Mul, Sub};
-use crate::cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
@@ -258,7 +261,9 @@ fn map_offer((k, v): (Vec<u8>, Offering)) -> Offer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info};
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_dependencies_with_balance, mock_env, mock_info,
+    };
     use cosmwasm_std::{coins, Decimal, SubMsg};
 
     fn setup(deps: DepsMut) {
