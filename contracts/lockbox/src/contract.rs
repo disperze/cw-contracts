@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    entry_point, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, StdResult, Timestamp, WasmMsg,
+    entry_point, from_binary, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
+    Order, Response, StdResult, SubMsg, Timestamp, WasmMsg,
 };
 
 use crate::balance::GenericBalance;
@@ -56,7 +56,7 @@ pub fn execute(
             try_increase_lock(deps, env, Balance::from(info.funds), &info.sender, id)
         }
         ExecuteMsg::Unlock { id } => try_unlock(deps, env, info, id),
-        ExecuteMsg::Receive(msg) => try_recive(deps, env, info, msg),
+        ExecuteMsg::Receive(msg) => try_receive(deps, env, info, msg),
     }
 }
 
@@ -153,11 +153,11 @@ pub fn try_unlock(
     let res = Response::new()
         .add_attribute("action", "unlock")
         .add_attribute("from", info.sender)
-        .add_messages(messages);
+        .add_submessages(messages);
     Ok(res)
 }
 
-pub fn try_recive(
+pub fn try_receive(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -176,16 +176,15 @@ pub fn try_recive(
     }
 }
 
-fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>> {
+fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<SubMsg>> {
     let native_balance = &balance.native;
-    let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
+    let mut msgs: Vec<SubMsg> = if native_balance.is_empty() {
         vec![]
     } else {
-        vec![BankMsg::Send {
+        vec![SubMsg::new(BankMsg::Send {
             to_address: to.into(),
             amount: native_balance.to_vec(),
-        }
-        .into()]
+        })]
     };
 
     let cw20_balance = &balance.cw20;
@@ -201,7 +200,7 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
                 msg: to_binary(&msg)?,
                 funds: vec![],
             };
-            Ok(exec.into())
+            Ok(SubMsg::new(exec))
         })
         .collect();
     msgs.append(&mut cw20_msgs?);
