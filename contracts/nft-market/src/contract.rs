@@ -139,7 +139,6 @@ pub fn execute_withdraw(
     let res = Response::new()
         .add_attribute("action", "withdraw_nft")
         .add_attribute("seller", info.sender)
-        .add_attribute("offering_id", offering_id)
         .add_message(exec_cw721_transfer);
     Ok(res)
 }
@@ -164,6 +163,7 @@ pub fn execute_receive_nft(
     let price_string = format!("{}{}", msg.list_price.amount, msg.list_price.denom);
     let res = Response::new()
         .add_attribute("action", "sell_nft")
+        .add_attribute("offering_id", id)
         .add_attribute("nft_contract", info.sender)
         .add_attribute("seller", off.seller)
         .add_attribute("list_price", price_string)
