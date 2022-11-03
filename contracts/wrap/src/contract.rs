@@ -16,7 +16,7 @@ use cw20_base::contract::{
     execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_minter,
     query_token_info,
 };
-use cw20_base::enumerable::{query_all_accounts, query_all_allowances};
+use cw20_base::enumerable::{query_all_accounts, query_owner_allowances};
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 // version info for migration info
@@ -179,7 +179,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             owner,
             start_after,
             limit,
-        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?),
+        } => to_binary(&query_owner_allowances(deps, owner, start_after, limit)?),
         QueryMsg::AllAccounts { start_after, limit } => {
             to_binary(&query_all_accounts(deps, start_after, limit)?)
         }
@@ -253,7 +253,7 @@ mod tests {
         )
         .unwrap();
         let response: BalanceResponse = from_binary(&data).unwrap();
-        assert_eq!(response.balance, 20u8.into());
+        assert_eq!(response.balance, Uint128::from(20u8));
     }
 
     #[test]
@@ -302,6 +302,6 @@ mod tests {
         )
         .unwrap();
         let response: BalanceResponse = from_binary(&data).unwrap();
-        assert_eq!(response.balance, (amount_deposit - amount_withdraw).into());
+        assert_eq!(response.balance, Uint128::from(amount_deposit - amount_withdraw));
     }
 }
