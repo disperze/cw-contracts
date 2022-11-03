@@ -12,13 +12,11 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cosmwasm-std = { version = "1.0.0-beta" }
-cosmwasm-storage = { version = "1.0.0-beta" }
-cw-storage-plus = { version = "0.10.0", features = ["iterator"] }
-cw2 = "0.10.0"
-schemars = "0.8.1"
-serde = { version = "1.0.125", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.24" }
-
-[dev-dependencies]
-cosmwasm-schema = { version = "1.0.0-beta" }
+cosmwasm-schema = "1.1.0"
+cosmwasm-std =  "1.1.0"
+cosmwasm-storage =  "1.1.0"
+cw-storage-plus = { version = "0.16.0", features = ["iterator"] }
+cw2 = "0.16.0"
+schemars = "0.8"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0" }
