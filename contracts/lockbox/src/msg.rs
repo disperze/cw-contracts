@@ -1,16 +1,14 @@
 use cosmwasm_std::{Coin, Timestamp};
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     /// Max lock time in seconds
     pub max_lock_time: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     /// Lock funds until expire timestamp
     Lock { id: String, expire: Timestamp },
@@ -22,24 +20,24 @@ pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ReceiveMsg {
     Lock { id: String, expire: Timestamp },
     IncreaseLock { id: String },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Returns the lock info
+    #[returns(LockInfo)]
     Lock { address: String, id: String },
     /// Returns the locks by address
+    #[returns(AllLocksResponse)]
     AllLocks { address: String },
 }
 
-// We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct LockInfo {
     pub id: String,
     pub create: Timestamp,
@@ -50,7 +48,7 @@ pub struct LockInfo {
     pub cw20_balance: Vec<Cw20Coin>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct AllLocksResponse {
     pub locks: Vec<String>,
 }

@@ -1,10 +1,8 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, Uint128};
 use cw20::Expiration;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     /// native coin to wrap
     pub native_coin: String,
@@ -15,8 +13,7 @@ pub struct InstantiateMsg {
     pub decimals: u8,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     /// Deposit token and get wrapped cw20 token
     Deposit {},
@@ -70,22 +67,27 @@ pub enum ExecuteMsg {
     BurnFrom { owner: String, amount: Uint128 },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
     // Implements CW20
     /// CW20. Returns the current balance of the given address, 0 if unset.
+    #[returns(cw20::BalanceResponse)]
     Balance { address: String },
     /// CW20. Returns metadata on the contract - name, decimals, supply, etc.
+    #[returns(cw20::TokenInfoResponse)]
     TokenInfo {},
     /// CW20. Only with "mintable" extension.
     /// Returns who can mint and how much.
+    #[returns(cw20::MinterResponse)]
     Minter {},
     /// CW20 "allowance" extension.
     /// Returns how much spender can use from owner account, 0 if unset.
+    #[returns(cw20::AllowanceResponse)]
     Allowance { owner: String, spender: String },
     /// CW20. Only with "enumerable" extension (and "allowances")
     /// Returns all allowances this owner has approved. Supports pagination.
+    #[returns(cw20::AllAllowancesResponse)]
     AllAllowances {
         owner: String,
         start_after: Option<String>,
@@ -93,6 +95,7 @@ pub enum QueryMsg {
     },
     /// CW20. Only with "enumerable" extension
     /// Returns all accounts that have balances. Supports pagination.
+    #[returns(cw20::AllAccountsResponse)]
     AllAccounts {
         start_after: Option<String>,
         limit: Option<u32>,
