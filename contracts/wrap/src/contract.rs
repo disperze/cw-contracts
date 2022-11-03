@@ -302,6 +302,9 @@ mod tests {
         )
         .unwrap();
         let response: BalanceResponse = from_binary(&data).unwrap();
-        assert_eq!(response.balance, Uint128::from(amount_deposit - amount_withdraw));
+        assert_eq!(
+            response.balance,
+            Uint128::from(amount_deposit - amount_withdraw)
+        );
     }
 }

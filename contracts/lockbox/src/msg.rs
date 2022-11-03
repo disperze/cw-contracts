@@ -1,6 +1,6 @@
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Timestamp};
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
-use cosmwasm_schema::{cw_serde, QueryResponses};
 
 #[cw_serde]
 pub struct InstantiateMsg {

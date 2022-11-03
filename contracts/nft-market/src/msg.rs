@@ -1,6 +1,6 @@
 use crate::cw721::Cw721ReceiveMsg;
-use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{Addr, Coin, Decimal, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
