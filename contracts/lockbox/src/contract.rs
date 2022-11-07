@@ -228,7 +228,6 @@ fn query_locks(deps: Deps, address: String) -> StdResult<AllLocksResponse> {
     let locks_id: Result<Vec<_>, _> = LOCKS
         .prefix(owner_addr)
         .keys(deps.storage, None, None, Order::Ascending)
-        .map(String::from_utf8)
         .collect();
 
     Ok(AllLocksResponse { locks: locks_id? })
@@ -495,7 +494,7 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), msg);
 
         match res {
-            StdResult::Err(StdError::NotFound { .. }) => {}
+            Err(StdError::NotFound { .. }) => {}
             _ => panic!("Must return StdError::NotFound error"),
         }
     }

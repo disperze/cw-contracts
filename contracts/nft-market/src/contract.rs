@@ -15,7 +15,7 @@ use cw_storage_plus::Bound;
 use std::ops::{Mul, Sub};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
+const CONTRACT_NAME: &str = "crates.io:cw-nft-market";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const DEFAULT_LIMIT: u32 = 10;
@@ -241,7 +241,7 @@ fn query_all(
     limit: Option<u32>,
 ) -> StdResult<OffersResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(Bound::exclusive);
+    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into_bytes()));
 
     let offers: StdResult<Vec<Offer>> = OFFERINGS
         .range(deps.storage, start, None, Order::Ascending)
@@ -252,9 +252,9 @@ fn query_all(
     Ok(OffersResponse { offers: offers? })
 }
 
-fn map_offer((k, v): (Vec<u8>, Offering)) -> Offer {
+fn map_offer((k, v): (String, Offering)) -> Offer {
     Offer {
-        id: String::from_utf8_lossy(&k).to_string(),
+        id: k,
         token_id: v.token_id,
         contract: v.contract,
         seller: v.seller,

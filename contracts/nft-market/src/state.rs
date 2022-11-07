@@ -1,18 +1,17 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
 
 use crate::error::ContractError;
 use cosmwasm_std::{Addr, Api, Coin, Decimal, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct State {
     pub num_offerings: u64,
     pub fee: Decimal,
     pub owner: Addr,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct Offering {
     pub token_id: String,
     pub contract: Addr,
