@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use cw_wjuno::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use cw_disper_wrap::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {

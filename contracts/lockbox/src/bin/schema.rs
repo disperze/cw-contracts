@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use cw_lockbox::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use cw_disper_lockbox::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {
