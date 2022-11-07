@@ -20,7 +20,7 @@ use cw20_base::enumerable::{query_all_accounts, query_owner_allowances};
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw-wjuno";
+const CONTRACT_NAME: &str = "crates.io:cw-wrap";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]

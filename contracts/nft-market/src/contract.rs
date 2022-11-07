@@ -15,7 +15,7 @@ use cw_storage_plus::Bound;
 use std::ops::{Mul, Sub};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw-dsp-nft-market";
+const CONTRACT_NAME: &str = "crates.io:cw-nft-market";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const DEFAULT_LIMIT: u32 = 10;
